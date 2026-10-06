@@ -17,6 +17,7 @@ stranica to KAŽE i onemogući uvoz; nadogradnja šeme ostaje svjesna operacija
 pri deployu, ne nusproizvod prvog uploada.
 """
 import csv
+import hmac
 import io
 import logging
 import zipfile
@@ -28,6 +29,7 @@ from matbot import admin_auth, config, parent_report, report_input, reporting_db
 from matbot import report_facts, student_grades
 from matbot import report_pdf, report_prompt, reporting_schema
 from matbot import thinkific_progress as progress
+from matbot import thinkific_roster
 from matbot.admin_auth import CSRF_FORM_FIELD, require_admin
 from matbot.ratelimit import RateLimiter
 
@@ -283,7 +285,8 @@ def _collect_files(files_storage):
 
 def _outcome(summary, blocked_count):
     """Djelimičan uspjeh se NIKAD ne smije prikazati kao uspjeh (Dio 10)."""
-    failed = blocked_count + sum(1 for f in summary.files if f["status"] != "imported")
+    failed = (blocked_count + summary.students_skipped
+              + sum(1 for f in summary.files if f["status"] != "imported"))
     if summary.files_imported and not failed:
         return STATUS_FULL
     if summary.files_imported and failed:
@@ -321,7 +324,10 @@ def import_files():
                               month=month, schema=(state, message)), 400
 
     # SVA logika je u Fazi 3A. Ovdje se ne parsira nijedan red.
-    summary = report_input.import_progress_files(month, files)
+    # Legacy put smije samo dopuniti napredak VEĆ ODOBRENIH identiteta.
+    # Novi učenik nastaje isključivo kroz roster preview/apply izbor osoblja.
+    summary = report_input.import_progress_files(
+        month, files, create_missing=False)
     outcome = _outcome(summary, len(upload_errors))
     logger.info("admin_import month=%s files=%s imported=%s rows=%s outcome=%s",
                 month, summary.files_received, summary.files_imported,
@@ -344,6 +350,107 @@ def _render_result(summary, outcome, upload_errors, *, month, schema):
         errors=upload_errors or [],
         labels={key: label for key, label, _ in COURSE_FIELDS},
     )
+
+
+def _roster_sources():
+    """Četiri uploada → sirovi fajlovi i četiri potpuno validirana objekta."""
+    files, upload_errors = _collect_files(request.files)
+    missing = [key for key, _label, _name in COURSE_FIELDS if key not in files]
+    if upload_errors or missing:
+        return None, None, (
+            "Za pregled registra odaberi sva četiri važeća CSV fajla.")
+    try:
+        month = progress.parse_report_month(request.form.get("report_month", ""))
+        parsed = {key: progress.parse_progress_csv(files[key], key, month)
+                  for key, _label, _name in COURSE_FIELDS}
+    except progress.ProgressFormatError as error:
+        logger.info("thinkific_roster_rejected code=%s row=%s",
+                    error.code, error.row)
+        return None, None, (
+            "Jedan CSV nije ispravan. Provjeri fajlove i pokušaj ponovo.")
+    return files, parsed, None
+
+
+@admin_reports_bp.route("/roster/preview", methods=["POST"])
+@require_admin
+def preview_roster():
+    """Read-only diff četiri trenutna izvoza prema MAT-BOT registru."""
+    _require_csrf()
+    state, _message = schema_state()
+    if state != "ready":
+        return jsonify({"status": "error",
+                        "message": "Izvještajna baza trenutno nije spremna."}), 409
+    _files, parsed, error = _roster_sources()
+    if error:
+        return jsonify({"status": "error", "message": error}), 400
+    try:
+        plan = thinkific_roster.build_plan(parsed, reporting_db.get_database())
+    except (reporting_db.ReportingUnavailable,
+            thinkific_roster.RosterPlanError) as caught:
+        logger.info("thinkific_roster_preview_failed code=%s",
+                    getattr(caught, "code", type(caught).__name__))
+        return jsonify({"status": "error",
+                        "message": "Pregled promjena trenutno nije dostupan."}), 503
+    payload = plan.public()
+    payload["status"] = "ready" if plan.apply_allowed else "blocked"
+    return jsonify(payload)
+
+
+@admin_reports_bp.route("/roster/apply", methods=["POST"])
+@require_admin
+def apply_roster():
+    """Ponovo pročitaj izvore, potvrdi plan i primijeni samo označene akcije."""
+    _require_csrf()
+    state, _message = schema_state()
+    if state != "ready":
+        return jsonify({"status": "error",
+                        "message": "Izvještajna baza trenutno nije spremna."}), 409
+    files, parsed, error = _roster_sources()
+    if error:
+        return jsonify({"status": "error", "message": error}), 400
+    database = reporting_db.get_database()
+    try:
+        plan = thinkific_roster.build_plan(parsed, database)
+        supplied = request.form.get("plan_id", "")
+        if (not plan.apply_allowed or not supplied
+                or not hmac.compare_digest(supplied, plan.plan_id or "")):
+            logger.info("thinkific_roster_apply_refused code=plan_mismatch")
+            return jsonify({
+                "status": "error",
+                "message": (
+                    "Podaci su se promijenili nakon pregleda. Napravi novi "
+                    "pregled prije primjene."),
+            }), 409
+        actions = thinkific_roster.selected_actions(
+            plan, request.form.getlist("action_keys"))
+        applied = database.apply_roster_reconciliation(actions)
+    except thinkific_roster.RosterPlanError as caught:
+        logger.info("thinkific_roster_apply_refused code=%s", caught.code)
+        return jsonify({"status": "error",
+                        "message": "Izbor promjena nije ispravan."}), 400
+    except reporting_db.ReportingUnavailable as caught:
+        logger.info("thinkific_roster_apply_failed code=%s", caught.code)
+        return jsonify({"status": "error",
+                        "message": "Promjene nisu sačuvane. Pokušaj ponovo."}), 503
+
+    # Fajlovi su upravo drugi put potpuno validirani. Uvoz napretka ne smije
+    # ponovo kreirati isključene nove učenike niti prepisati neoznačena imena.
+    imported = report_input.import_progress_files(
+        plan.report_month, files, database=database, create_missing=False,
+        refresh_existing_names=False)
+    fully_imported = imported.files_imported == len(thinkific_roster.REQUIRED_COURSES)
+    if not fully_imported:
+        logger.info("thinkific_roster_progress_partial imported=%s",
+                    imported.files_imported)
+    return jsonify({
+        "status": "applied" if fully_imported else "partial",
+        "message": (
+            "Registar je osvježen i napredak je uvezen."
+            if fully_imported else
+            "Registar je osvježen, ali dio napretka nije uvezen."),
+        "applied": applied,
+        "import": imported.as_dict(),
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -560,9 +667,12 @@ def _render_student(student_id, month, payload, *, ai_error="", notice=""):
         logger.info("admin_report_load_failed code=%s", error.code)
         saved = None
         ai_error = ai_error or parent_report.SAFE_AI_ERROR
+    current_label = _student_label(payload["profile"], student_id)
+    saved_label = (((saved or {}).get("snapshot") or {}).get("student")
+                   or {}).get("label")
     return render_template(
         "admin_student.html", month=month, payload=payload,
-        label=_student_label(payload["profile"], student_id),
+        label=saved_label or current_label,
         month_label=_month_label(month),
         previous_month=report_input.previous_month(month), schema_message="",
         saved=saved, csrf_token=admin_auth.csrf_token(),
@@ -660,7 +770,8 @@ def _generate_one_report(student_id, month, *, replace):
     snapshot = parent_report.metrics_snapshot(
         facts, model=config.REPORTING_MODEL,
         prompt_version=report_prompt.REPORT_PROMPT_VERSION,
-        parent_comments=parent_comments)
+        parent_comments=parent_comments,
+        student_label=_student_label(payload["profile"], student_id))
     if comments_were_edited:
         snapshot["parent_comments_edited"] = True
     try:
@@ -759,7 +870,8 @@ def _saved_pdf(student_id, month):
     facts = (saved.get("snapshot") or {}).get("facts")
     if not facts:
         facts = report_facts.build_ai_facts(payload)
-    label = _student_label(payload["profile"], student_id)
+    label = ((((saved.get("snapshot") or {}).get("student") or {}).get("label"))
+             or _student_label(payload["profile"], student_id))
     data = report_pdf.render_report_pdf(
         facts, saved["narrative"], saved["instructor_comment"], label,
         saved.get("parent_comments"))

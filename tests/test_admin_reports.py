@@ -16,7 +16,9 @@ import re
 
 import pytest
 
-from matbot import activity, admin_auth, admin_reports, report_input, reporting_db
+from matbot import (activity, admin_auth, admin_reports, report_input,
+                    reporting_db, student_identity)
+from matbot import thinkific_progress as progress
 from matbot.api import _kontrolni_attempt
 from matbot.student_identity import PROVIDER_THINKIFIC_EMAIL
 
@@ -99,7 +101,24 @@ def _csrf(client, path="/admin/reports"):
     return _csrf_from(client.get(path))
 
 
-def _upload(client, month="2026-09", files=None, csrf=None):
+def _upload(client, month="2026-09", files=None, csrf=None, *, approve=True):
+    # Većina legacy-route testova provjerava uvoz napretka POZNATOG učenika.
+    # Odobrenje je izričita testna priprema; `approve=False` dokazuje da sama
+    # ruta više ne može napraviti identitet.
+    if approve:
+        database = reporting_db.get_database()
+        for course_key, (payload, filename) in (files or {}).items():
+            if not str(filename).lower().endswith(".csv"):
+                continue
+            try:
+                parsed = progress.parse_progress_csv(payload, course_key, month)
+            except progress.ProgressFormatError:
+                continue
+            for row in parsed.rows:
+                email = student_identity.normalize_email(row.email)
+                if email:
+                    database.get_or_create_student(
+                        PROVIDER_THINKIFIC_EMAIL, email, row.display_name)
     data = {"csrf_token": csrf if csrf is not None else _csrf(client),
             "report_month": month}
     for key, (payload, name) in (files or {}).items():
@@ -107,6 +126,24 @@ def _upload(client, month="2026-09", files=None, csrf=None):
         data[key] = (_io.BytesIO(payload), name)
     return client.post("/admin/reports/import", data=data,
                        content_type="multipart/form-data")
+
+
+def _roster_upload(client, route, by_course=None, *, plan_id=None,
+                   action_keys=None, csrf=None):
+    import io as _io
+
+    by_course = by_course or {}
+    data = {"csrf_token": csrf if csrf is not None else _csrf(client),
+            "report_month": "2026-09"}
+    for grade in range(6, 10):
+        key = "grade_%d" % grade
+        payload = build_csv(by_course.get(key, []), sections=["OBLAST"])
+        data[key] = (_io.BytesIO(payload), key + ".csv")
+    if plan_id is not None:
+        data["plan_id"] = plan_id
+    if action_keys is not None:
+        data["action_keys"] = list(action_keys)
+    return client.post(route, data=data, content_type="multipart/form-data")
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +156,8 @@ def test_unauthenticated_get_is_redirected_to_login(client, admin_env):
 
 
 def test_unauthenticated_import_post_is_denied(client, admin_env, db):
-    response = _upload(client, files={"grade_6": (simple_csv(), "a.csv")}, csrf="x")
+    response = _upload(client, files={"grade_6": (simple_csv(), "a.csv")},
+                       csrf="x", approve=False)
     assert response.status_code == 403
     assert rows(db, "SELECT COUNT(*) FROM thinkific_progress_snapshots")[0][0] == 0
 
@@ -141,14 +179,15 @@ def test_correct_password_is_accepted(client, admin_env):
 
 
 def test_post_without_csrf_is_rejected(admin, db):
-    response = _upload(admin, files={"grade_6": (simple_csv(), "a.csv")}, csrf="")
+    response = _upload(admin, files={"grade_6": (simple_csv(), "a.csv")},
+                       csrf="", approve=False)
     assert response.status_code == 403 or response.status_code == 400
     assert rows(db, "SELECT COUNT(*) FROM thinkific_progress_snapshots")[0][0] == 0
 
 
 def test_post_with_foreign_csrf_is_rejected(admin, db):
     response = _upload(admin, files={"grade_6": (simple_csv(), "a.csv")},
-                       csrf="tudji-token-koji-nije-iz-sesije")
+                       csrf="tudji-token-koji-nije-iz-sesije", approve=False)
     assert response.status_code == 400
     assert rows(db, "SELECT COUNT(*) FROM thinkific_progress_snapshots")[0][0] == 0
 
@@ -222,6 +261,37 @@ def test_valid_month_and_one_file_import(admin, db):
     assert response.status_code == 200
     assert "Import potpuno uspješan" in response.get_data(as_text=True)
     assert rows(db, "SELECT COUNT(*) FROM thinkific_progress_snapshots")[0][0] == 1
+
+
+def test_legacy_import_skips_unknown_student_without_creating_identity(admin, db):
+    response = _upload(
+        admin, files={"grade_6": (simple_csv(), "neodobren.csv")},
+        approve=False)
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Import djelimično uspješan" in html
+    assert "Import potpuno uspješan" not in html
+    assert "neodobrenih preskočeno" in html
+    assert rows(db, "SELECT COUNT(*) FROM students")[0][0] == 0
+    assert rows(db, "SELECT COUNT(*) FROM student_accounts")[0][0] == 0
+    assert rows(db, "SELECT COUNT(*) FROM thinkific_progress_snapshots")[0][0] == 0
+
+
+def test_legacy_import_still_updates_progress_for_approved_student(admin, db):
+    database = reporting_db.get_database()
+    student_id = database.get_or_create_student(
+        PROVIDER_THINKIFIC_EMAIL, E1, "Poznati 6")
+
+    response = _upload(
+        admin, files={"grade_6": (simple_csv(completed=48), "poznati.csv")},
+        approve=False)
+
+    assert response.status_code == 200
+    assert "Import potpuno uspješan" in response.get_data(as_text=True)
+    assert rows(db, "SELECT student_id, percent_completed FROM "
+                    "thinkific_progress_snapshots") == [(student_id, 48.0)]
+    assert rows(db, "SELECT COUNT(*) FROM students")[0][0] == 1
 
 
 @pytest.mark.parametrize("bad", ["", "2026", "2026-13", "rujan"])
@@ -313,6 +383,65 @@ def test_updated_same_month_upload_updates_the_snapshot(admin, db):
     assert stored == [(48.0,)]
 
 
+def test_roster_preview_and_apply_refresh_name_but_not_unconfirmed_grade(admin, db):
+    _upload(admin, month="2026-08", files={
+        "grade_7": (build_csv([
+            learner(E1, first="Amer", last="7")]), "old.csv")})
+    student_id = rows(db, "SELECT id FROM students")[0][0]
+    reporting_db.get_database().set_student_grade(student_id, 7)
+    current = {
+        "grade_8": [learner(E1, first="Amer", last="8")],
+    }
+
+    preview = _roster_upload(
+        admin, "/admin/reports/roster/preview", current)
+    assert preview.status_code == 200
+    plan = preview.get_json()
+    assert plan["status"] == "ready"
+    assert plan["summary"]["name_changes"] == 1
+    assert plan["summary"]["grade_suggestions"] == 1
+    selected = [item["key"] for item in plan["actions"]
+                if item["default_selected"]]
+    assert all(item["kind"] != "grade" for item in plan["actions"]
+               if item["default_selected"])
+
+    applied = _roster_upload(
+        admin, "/admin/reports/roster/apply", current,
+        plan_id=plan["plan_id"], action_keys=selected)
+    assert applied.status_code == 200
+    assert applied.get_json()["status"] == "applied"
+    assert rows(db, "SELECT id, display_name, grade FROM students") == \
+        [(student_id, "Amer 8", 7)]
+    assert rows(db, "SELECT grade FROM student_current_grades") == [(7,)]
+
+
+def test_roster_preview_requires_all_four_exports(admin, db):
+    import io as _io
+
+    preview = admin.post("/admin/reports/roster/preview", data={
+        "csrf_token": _csrf(admin), "report_month": "2026-09",
+        "grade_6": (_io.BytesIO(build_csv([])), "only-one.csv"),
+    }, content_type="multipart/form-data")
+    assert preview.status_code == 400
+    assert "sva četiri" in preview.get_json()["message"]
+
+
+def test_unselected_new_roster_student_is_not_created_by_progress_import(admin, db):
+    current = {
+        "grade_8": [learner("nova@example.com", first="Nova", last="8")],
+    }
+    preview = _roster_upload(
+        admin, "/admin/reports/roster/preview", current).get_json()
+    assert preview["summary"]["new_students"] == 1
+
+    applied = _roster_upload(
+        admin, "/admin/reports/roster/apply", current,
+        plan_id=preview["plan_id"], action_keys=[])
+    assert applied.status_code == 200
+    assert applied.get_json()["import"]["students_skipped"] == 1
+    assert rows(db, "SELECT COUNT(*) FROM students")[0][0] == 0
+
+
 def test_partial_success_is_never_shown_as_success(admin, db):
     files = {"grade_6": (simple_csv(), "ok.csv"),
              "grade_7": (build_csv([learner(E2, viewed="besmislica")],
@@ -357,7 +486,8 @@ def test_schema_v1_disables_import_and_writes_nothing(client, admin_env, db_v1):
     assert "Uvoz nije moguć" in page.get_data(as_text=True)
     assert "disabled" in page.get_data(as_text=True)
 
-    response = _upload(client, files={"grade_6": (simple_csv(), "a.csv")})
+    response = _upload(client, files={"grade_6": (simple_csv(), "a.csv")},
+                       approve=False)
     assert response.status_code == 409
     # NIJEDNA tabela nije kreirana iz web zahtjeva.
     tables = {r[0] for r in rows(db_v1, "SELECT name FROM sqlite_master "

@@ -5,6 +5,11 @@ Thinkific columns `First Name`, `Last Name`, and `Email`. It matches only an
 existing `student_accounts` row whose provider is `thinkific_email` and whose
 `external_user_id` equals the canonically normalized email.
 
+This remains a recovery tool for old blank profiles. Current four-file roster
+refreshes use the preview/apply workflow on the Bot Reports page; a valid latest
+Thinkific name for the same normalized email may replace an older display name
+there. This backfill command still never overwrites a non-empty name.
+
 The command is intentionally separate from the Thinkific progress importer.
 It does not accept a report month and cannot write progress data.
 

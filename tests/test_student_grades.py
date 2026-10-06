@@ -99,8 +99,10 @@ def test_tutor_identity_never_writes_a_profile_grade(db):
     """Razred zahtjeva je PARAMETAR TURNUSA, ne tvrdnja o profilu."""
     identity = {"provider": student_identity.PROVIDER_THINKIFIC_EMAIL,
                 "external_user_id": "ucenik@example.com"}
+    approved = db.get_or_create_student(
+        student_identity.PROVIDER_THINKIFIC_EMAIL, "ucenik@example.com")
     student_id = student_identity.resolve_student(identity)
-    assert student_id is not None
+    assert student_id == approved
     profile = db.fetch_student_profile(student_id)
     assert profile["grade"] is None, "tutorski put je upisao razred u profil"
 

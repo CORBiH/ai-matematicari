@@ -168,7 +168,8 @@ def generate_narrative(facts, llm):
 REPORT_FORMAT_VERSION = "3d-1"
 
 
-def metrics_snapshot(facts, *, model, prompt_version, parent_comments=None):
+def metrics_snapshot(facts, *, model, prompt_version, parent_comments=None,
+                     student_label=None):
     """Ono što se sprema kao `metrics_json`.
 
     Nosi činjenice OD KOJIH je izvještaj nastao plus minimalne metapodatke o
@@ -179,7 +180,7 @@ def metrics_snapshot(facts, *, model, prompt_version, parent_comments=None):
     ima kolonu `generated_at`, pa bi drugi žig u JSON-u bio drugi izvor iste
     istine — a dva žiga se prije ili kasnije raziđu. Model i verzija prompta
     ostaju ovdje jer za njih kolone nema."""
-    return {
+    snapshot = {
         "facts": facts,
         # ZAPAŽANJA STOJE IZVAN `facts`, i to je granica a ne uredništvo:
         # `facts` je tačno ono što je model vidio, pa slobodan tekst
@@ -188,6 +189,13 @@ def metrics_snapshot(facts, *, model, prompt_version, parent_comments=None):
         "report_format_version": REPORT_FORMAT_VERSION,
         "generated_by": {"model": model, "prompt_version": prompt_version},
     }
+    # Ime ne ide u ``facts`` niti modelu. Čuva se samo kao dokumentni metapodatak
+    # da kasnija promjena tekućeg profila ne preimenuje već sačuvani izvještaj.
+    # Stari snimci bez ovog polja ostaju čitljivi uz kompatibilni fallback.
+    label = str(student_label or "").strip()
+    if label:
+        snapshot["student"] = {"label": label[:120]}
+    return snapshot
 
 
 def load_saved(student_id, report_month, database=None):

@@ -8,10 +8,9 @@ Dvije odvojene tvrdnje se ovdje dokazuju i ne smiju se brkati:
      `X-Tutor-Token`. Poslije toga nijedan tutorski zahtjev ne može promijeniti
      pripisivanje. Test s lažnim e-mailom u chat JSON-u je najvažniji u fajlu.
 
-ŠTA SE OVDJE NE TVRDI: da je identitet autentifikovan. Nije — učenik koji ručno
-otvori `/?thinkific_email=neko@drugi.com` pripisaće aktivnost tuđoj adresi, i to
-je izmjeren, prihvaćen MVP kompromis (`test_manual_url_can_attribute_to_another
-_address_known_mvp_limit` to i dokazuje, da granica ostane vidljiva u kodu).
+ŠTA SE OVDJE NE TVRDI: da je identitet autentifikovan. Nije. Zato nepoznata
+adresa iz `/?thinkific_email=...` ostaje anonimna za izvještavanje dok je osoblje
+ne odobri; poznata adresa i dalje može pripisati aktivnost postojećem zapisu.
 
 Nijedan test ne dodiruje živi Turso — sve ide na lokalnu libsql datoteku.
 """
@@ -109,6 +108,14 @@ def student_id_for(path, email):
     return found[0][0] if found else None
 
 
+def approve(email, display_name=None):
+    """Testna zamjena za izričito roster odobrenje prije tutorskog ulaza."""
+    normalized = normalize_email(email)
+    assert normalized is not None
+    return reporting_db.get_database().get_or_create_student(
+        PROVIDER_THINKIFIC_EMAIL, normalized, display_name)
+
+
 # ---------------------------------------------------------------------------
 # 1) Normalizacija
 # ---------------------------------------------------------------------------
@@ -182,17 +189,19 @@ def test_other_query_parameters_are_ignored(client):
 # 3) Kroz cijelu aplikaciju: e-mail -> tačno jedan učenik
 # ---------------------------------------------------------------------------
 def test_case_and_space_variants_are_one_student(client, fake_llm, reporting):
+    approved = approve("student@example.com")
     for raw in ("Student@Example.com", "student@example.com",
                 "  STUDENT@example.com  "):
         queue_two_call(fake_llm)
         assert chat(client, enter(client, raw)).status_code == 200
 
     assert students(reporting) == 1
-    assert student_id_for(reporting, "student@example.com") is not None
+    assert student_id_for(reporting, "student@example.com") == approved
 
 
 def test_same_email_from_a_different_browser_is_the_same_student(client, fake_llm,
                                                                  reporting):
+    approve("student@example.com")
     queue_two_call(fake_llm)
     chat(client, enter(client, "student@example.com"), session_id="browser-1")
     first = student_id_for(reporting, "student@example.com")
@@ -207,6 +216,7 @@ def test_same_email_from_a_different_browser_is_the_same_student(client, fake_ll
 
 def test_different_emails_are_different_students(client, fake_llm, reporting):
     for email in ("amina@example.com", "emir@example.com"):
+        approve(email)
         queue_two_call(fake_llm)
         chat(client, enter(client, email))
 
@@ -215,18 +225,20 @@ def test_different_emails_are_different_students(client, fake_llm, reporting):
             != student_id_for(reporting, "emir@example.com"))
 
 
-def test_first_use_creates_the_student_automatically(client, fake_llm, reporting):
+def test_unknown_tutor_email_never_creates_an_unapproved_student(
+        client, fake_llm, reporting):
     assert students(reporting) == 0
     queue_two_call(fake_llm)
     chat(client, enter(client, "novi@example.com"))
 
-    assert students(reporting) == 1
+    assert students(reporting) == 0
     assert rows(reporting, "SELECT provider, external_user_id FROM student_accounts") \
-        == [(PROVIDER_THINKIFIC_EMAIL, "novi@example.com")]
+        == []
 
 
 def test_grade_is_metadata_and_never_splits_an_identity(client, fake_llm, reporting):
     """DIO 7: razred bira učenik u MAT-BOT meniju — nije identitet."""
+    approve("amina@example.com")
     queue_two_call(fake_llm)
     chat(client, enter(client, "amina@example.com"), grade=6)
     first = student_id_for(reporting, "amina@example.com")
@@ -242,6 +254,7 @@ def test_grade_is_metadata_and_never_splits_an_identity(client, fake_llm, report
 
 def test_display_name_is_never_invented_from_the_email(client, fake_llm, reporting):
     """DIO 8: ime se NE izvodi iz adrese — ostaje prazno."""
+    approve("amina.hodzic@example.com")
     queue_two_call(fake_llm)
     chat(client, enter(client, "amina.hodzic@example.com"))
 
@@ -252,6 +265,7 @@ def test_kontrolni_resolves_the_same_student_as_chat(client, flask_app, fake_llm
                                                      reporting):
     from tests.test_kontrolni import EchoKontrolniLLM, start_payload
 
+    approve("amina@example.com")
     queue_two_call(fake_llm)
     token = enter(client, "amina@example.com")
     chat(client, token)
@@ -272,6 +286,7 @@ def test_kontrolni_resolves_the_same_student_as_chat(client, flask_app, fake_llm
 def test_email_in_the_chat_payload_never_overrides_the_token(client, fake_llm,
                                                              reporting):
     """Zahtjev nosi ISPRAVAN token žrtve i LAŽNU adresu u pet JSON polja."""
+    approve("zrtva@example.com")
     queue_two_call(fake_llm)
     token = enter(client, "zrtva@example.com")
 
@@ -290,6 +305,7 @@ def test_email_in_the_chat_payload_never_overrides_the_token(client, fake_llm,
 
 def test_query_parameter_on_the_api_endpoint_is_ignored(client, fake_llm, reporting):
     """E-mail se troši SAMO na `GET /` — ne i na tutorskim endpointima."""
+    approve("zrtva@example.com")
     queue_two_call(fake_llm)
     token = enter(client, "zrtva@example.com")
 
@@ -374,18 +390,14 @@ def test_missing_token_is_still_rejected(flask_app, reporting):
 # ---------------------------------------------------------------------------
 # 5) Prihvaćena MVP granica — dokazana, da ostane vidljiva
 # ---------------------------------------------------------------------------
-def test_manual_url_can_attribute_to_another_address_known_mvp_limit(
+def test_manual_url_cannot_create_an_unapproved_reporting_identity(
         client, fake_llm, reporting):
-    """IZRIČITO PRIHVAĆENO OGRANIČENJE, nije propust.
-
-    Bez potpisa Thinkific strane server ne može razlikovati stvarni ulazak kroz
-    lekciju od ručno otkucanog URL-a. Zato pripisivanje NIJE ovlaštenje: ovaj
-    identitet ne smije otvoriti tuđ izvještaj niti dati ijedno pravo. Test
-    postoji da granica ostane MJERENA i vidljiva, a ne usmena."""
+    """Nepotpisani query parametar ne smije sam proširiti registar."""
     queue_two_call(fake_llm)
     chat(client, enter(client, "tudja.adresa@example.com"))
 
-    assert student_id_for(reporting, "tudja.adresa@example.com") is not None
+    assert student_id_for(reporting, "tudja.adresa@example.com") is None
+    assert students(reporting) == 0
 
 
 # ---------------------------------------------------------------------------

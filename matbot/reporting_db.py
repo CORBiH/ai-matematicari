@@ -32,6 +32,7 @@ odakle dolazi — spajanje na stvarni izvor (Thinkific SSO/JWT) je zasebna faza.
 """
 import hashlib
 import hmac
+import json
 import logging
 import threading
 import time
@@ -974,12 +975,14 @@ class ReportingDatabase:
     # jedna transakcija, pa pad ne ostavlja ništa — što je tačno ono što ugovor
     # „jedan neispravan red odbija cijeli fajl" i traži.
     def import_progress_file(self, *, report_month, course_key, course_name, grade,
-                             source_sha256, provider, rows):
+                             source_sha256, provider, rows, create_missing=True,
+                             refresh_existing_names=True):
         """Uvezi CIJELI provjereni fajl u jednoj transakciji. Vrati brojače.
 
         `rows` su već isparsirani i validirani redovi (`matbot/thinkific_progress.py`);
         ovdje se ne parsira ništa i ne donosi nijedna kurikularna odluka."""
         counters = {"students_created": 0, "students_reused": 0,
+                    "students_skipped": 0, "names_updated": 0,
                     "snapshots_inserted": 0, "snapshots_updated": 0,
                     "sections_written": 0, "grade_conflicts": 0}
         if not rows:
@@ -988,23 +991,20 @@ class ReportingDatabase:
         with self._lock:
             try:
                 conn = self._connection()
-                cursor = conn.execute(
-                    "INSERT INTO thinkific_progress_imports "
-                    "(report_month, course_key, course_name, grade, source_sha256, "
-                    " row_count) VALUES (?, ?, ?, ?, ?, ?)",
-                    (report_month, course_key, course_name, int(grade),
-                     source_sha256, len(rows)))
-                import_id = cursor.lastrowid
-
                 emails = [row["email"] for row in rows]
                 accounts = self._existing_accounts(conn, provider, emails)
 
                 # Novi učenici: `students` pa `student_accounts`. Ne može se
                 # grupno jer svakom treba njegov `id`, ali NEMA commita po
                 # učeniku — sve ostaje u istoj transakciji.
+                included = []
                 for row in rows:
                     if row["email"] in accounts:
                         counters["students_reused"] += 1
+                        included.append(row)
+                        continue
+                    if not create_missing:
+                        counters["students_skipped"] += 1
                         continue
                     # RAZRED KURSA NIJE TEKUĆI RAZRED UČENIKA (verzija 4).
                     # Šesti razred u ovom fajlu znači „koristi gradivo šestog
@@ -1025,17 +1025,35 @@ class ReportingDatabase:
                         (student_id, provider, row["email"]))
                     accounts[row["email"]] = student_id
                     counters["students_created"] += 1
+                    included.append(row)
 
-                student_ids = [accounts[row["email"]] for row in rows]
+                if not included:
+                    # Plan može svjesno izostaviti sve nove učenike jednog
+                    # kursa. Bez snimaka nema ni revizijskog "uvezen fajl" reda.
+                    conn.rollback()
+                    return counters
+
+                cursor = conn.execute(
+                    "INSERT INTO thinkific_progress_imports "
+                    "(report_month, course_key, course_name, grade, source_sha256, "
+                    " row_count) VALUES (?, ?, ?, ?, ?, ?)",
+                    (report_month, course_key, course_name, int(grade),
+                     source_sha256, len(included)))
+                import_id = cursor.lastrowid
+
+                student_ids = [accounts[row["email"]] for row in included]
+                included_emails = [row["email"] for row in included]
                 # `last_seen_at` se osvježava kao i do sada — samo grupno.
-                self._touch_students(conn, provider, student_ids, emails)
+                self._touch_students(conn, provider, student_ids, included_emails)
 
                 profiles = self._existing_profiles(conn, student_ids)
-                self._apply_profiles(conn, rows, accounts, profiles, grade, counters)
+                self._apply_profiles(
+                    conn, included, accounts, profiles, grade, counters,
+                    refresh_existing_names=refresh_existing_names)
 
                 snapshots = self._existing_snapshots(conn, course_key, report_month,
                                                      student_ids)
-                sections = self._apply_snapshots(conn, rows, accounts, snapshots,
+                sections = self._apply_snapshots(conn, included, accounts, snapshots,
                                                  import_id, report_month, course_key,
                                                  course_name, grade, counters)
                 self._replace_sections(conn, sections, counters)
@@ -1069,10 +1087,15 @@ class ReportingDatabase:
         for chunk in self._chunks(emails):
             placeholders = ",".join("?" * len(chunk))
             rows = _rows(conn.execute(
-                "SELECT external_user_id, student_id FROM student_accounts "
-                "WHERE provider = ? AND external_user_id IN (%s)" % placeholders,
+                "SELECT LOWER(TRIM(external_user_id)), student_id "
+                "FROM student_accounts WHERE provider = ? "
+                "AND LOWER(TRIM(external_user_id)) IN (%s)" % placeholders,
                 (provider, *chunk)))
             for email, student_id in rows:
+                if email in found and int(found[email]) != int(student_id):
+                    # Stara različita pisanja iste adrese ne smiju se tiho
+                    # svesti na proizvoljnog učenika.
+                    raise ReportingUnavailable("student_identity_duplicate")
                 found[email] = student_id
         return found
 
@@ -1086,7 +1109,8 @@ class ReportingDatabase:
             placeholders = ",".join("?" * len(chunk))
             conn.execute(
                 "UPDATE student_accounts SET last_seen_at = CURRENT_TIMESTAMP "
-                "WHERE provider = ? AND external_user_id IN (%s)" % placeholders,
+                "WHERE provider = ? "
+                "AND LOWER(TRIM(external_user_id)) IN (%s)" % placeholders,
                 (provider, *chunk))
 
     def _existing_profiles(self, conn, student_ids):
@@ -1099,8 +1123,58 @@ class ReportingDatabase:
                 profiles[student_id] = (name, grade)
         return profiles
 
-    def _apply_profiles(self, conn, rows, accounts, profiles, grade, counters):
-        """Dopuni SAMO ime. Razred se od verzije 4 NE dira ni pod kojim uslovom.
+    def _freeze_monthly_report_labels(self, conn, names_by_student):
+        """Dopuni samo nedostajuće historijsko ime prije promjene profila.
+
+        Stariji sačuvani izvještaji nisu imali ime u ``metrics_json`` pa je PDF
+        morao koristiti današnji profil. Bez ove kompatibilne dopune bi prvo
+        Thinkific osvježavanje imena preimenovalo i njihov naslov. Postojeće
+        činjenice, narativ, komentar, status i vremenski žig se ne mijenjaju.
+
+        Baze bez upotrebljive ``monthly_reports`` tabele i dalje smiju uvoziti
+        napredak: u njima nema sačuvanog izvještaja koji ovaj korak može zaštititi.
+        Nečitljiv JSON se također ne prepisuje nagađanjem.
+        """
+        cleaned = {int(student_id): _clean_display_name(name)
+                   for student_id, name in (names_by_student or {}).items()
+                   if _clean_display_name(name)}
+        if not cleaned:
+            return
+        from matbot import reporting_schema
+        if reporting_schema.verify_monthly_reports_schema(conn):
+            return
+
+        for chunk in self._chunks(sorted(cleaned)):
+            placeholders = ",".join("?" * len(chunk))
+            reports = _rows(conn.execute(
+                "SELECT id, student_id, metrics_json FROM monthly_reports "
+                "WHERE student_id IN (%s)" % placeholders, tuple(chunk)))
+            for report_id, student_id, raw_snapshot in reports:
+                if raw_snapshot:
+                    try:
+                        snapshot = json.loads(raw_snapshot)
+                    except (TypeError, ValueError):
+                        continue
+                    if not isinstance(snapshot, dict):
+                        continue
+                else:
+                    snapshot = {}
+                student = snapshot.get("student")
+                if student is not None and not isinstance(student, dict):
+                    continue
+                if student is None:
+                    student = {}
+                if str(student.get("label") or "").strip():
+                    continue
+                snapshot["student"] = dict(student, label=cleaned[int(student_id)])
+                conn.execute(
+                    "UPDATE monthly_reports SET metrics_json = ? WHERE id = ?",
+                    (json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                     int(report_id)))
+
+    def _apply_profiles(self, conn, rows, accounts, profiles, grade, counters,
+                        *, refresh_existing_names=True):
+        """Osvježi valjano ime. Razred se ne dira ni pod kojim uslovom.
 
         ŠTA JE UKLONJENO I ZAŠTO: ranije se `grade` kursa upisivao u
         `students.grade` kad je zatečena vrijednost bila NULL. To je bila tiha
@@ -1114,17 +1188,33 @@ class ReportingDatabase:
         To je korisna informacija (može otkriti pogrešno izabran slot), ali NIJE
         greška i ne pokreće nikakvu izmjenu.
 
-        Ime se i dalje upisuje samo preko praznog — prazno ime iz izvoza nikad
-        ne smije obrisati korisnu vrijednost."""
+        Najnoviji validni Thinkific izvoz je autoritet za prikazno ime istog
+        normalizovanog e-mail identiteta. Prazno ime nikad ne briše postojeće.
+        ``refresh_existing_names=False`` koristi pregledani roster apply: tada
+        je izbor osoblja već primijenjen i uvoz napretka ga ne smije zaobići."""
+        historical_names = {}
+        if refresh_existing_names:
+            for row in rows:
+                student_id = accounts[row["email"]]
+                existing_name, _existing_grade = profiles.get(
+                    student_id, (None, None))
+                if row["display_name"] and row["display_name"] != existing_name:
+                    historical_names[student_id] = existing_name
+        self._freeze_monthly_report_labels(conn, historical_names)
+
         for row in rows:
             student_id = accounts[row["email"]]
             existing_name, existing_grade = profiles.get(student_id, (None, None))
-            if row["display_name"] and not (existing_name or "").strip():
+            should_refresh = (refresh_existing_names
+                              and row["display_name"]
+                              and row["display_name"] != existing_name)
+            if should_refresh:
                 conn.execute(
                     "UPDATE students SET display_name = ?, "
                     "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                     (row["display_name"], student_id))
                 profiles[student_id] = (row["display_name"], existing_grade)
+                counters["names_updated"] += 1
             if (grade is not None and existing_grade is not None
                     and int(existing_grade) != int(grade)):
                 counters["grade_conflicts"] += 1
@@ -1474,6 +1564,235 @@ class ReportingDatabase:
                 self._drop_connection()
                 raise ReportingUnavailable(
                     "profile_read_failed:" + type(exc).__name__, exc) from None
+
+    # --- THINKIFIC ROSTER RECONCILIATION -----------------------------------
+    def fetch_roster_state(self):
+        """Čitljivo stanje registra za preview, uključujući identitetske veze.
+
+        Ovo je jedini roster upit koji vraća ``external_user_id`` i zato se
+        koristi isključivo u administratorskom, server-side planeru. HTTP sloj
+        dobija samo maskiranu adresu iz ``thinkific_roster``.
+        """
+        with self._lock:
+            try:
+                conn = self._connection()
+                has_v4 = self._grade_confirmation_available(conn)
+                has_v7 = self._student_profile_v7_available(conn)
+                confirmation = (
+                    "grade_confirmed_at, grade_source" if has_v4
+                    else "NULL, NULL")
+                account_type = ("account_type" if has_v7 else "'STUDENT'")
+                rows = _rows(conn.execute(
+                    "SELECT id, display_name, grade, status, "
+                    + confirmation + ", " + account_type + " FROM students "
+                    "ORDER BY id"))
+                current = (self._current_grades(conn, [row[0] for row in rows])
+                           if has_v7 and rows else {})
+                students = []
+                from matbot import student_grades
+                for student_id, name, grade, status, confirmed_at, source, kind in rows:
+                    grades = [item["grade"] for item in
+                              current.get(student_id, [])]
+                    if (not grades and student_grades.is_confirmed(
+                            grade, confirmed_at, source)):
+                        grades = [int(grade)]
+                    students.append({
+                        "student_id": int(student_id),
+                        "display_name": name,
+                        "status": status,
+                        "account_type": kind,
+                        "grades": grades,
+                    })
+                accounts = [{"student_id": int(row[0]),
+                             "external_user_id": row[1]}
+                            for row in _rows(conn.execute(
+                    "SELECT student_id, external_user_id FROM student_accounts "
+                    "WHERE provider = ? ORDER BY student_id, id",
+                    (_THINKIFIC_PROVIDER,)))]
+                return {"students": students, "accounts": accounts}
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "roster_state_read_failed:" + type(exc).__name__, exc) from None
+
+    def apply_roster_reconciliation(self, actions):
+        """Atomski primijeni isključivo akcije iz ponovo izgrađenog plana.
+
+        Imena se čuvaju guardom nad starom vrijednošću i e-mail vezom. Nestali
+        učenici se samo arhiviraju; nijedan istorijski red se ne briše. Razred
+        se zapisuje u postojeći ``student_current_grades`` autoritet, istim
+        izvorom ``admin`` kao ručna potvrda na profilu.
+        """
+        actions = list(actions or ())
+        counters = {"names_updated": 0, "students_created": 0,
+                    "students_archived": 0, "students_reactivated": 0,
+                    "grades_confirmed": 0}
+        if not actions:
+            return counters
+
+        kinds = {"name", "add", "archive", "reactivate", "grade"}
+        if any(getattr(action, "kind", None) not in kinds for action in actions):
+            raise ReportingUnavailable("roster_action_invalid")
+
+        with self._lock:
+            try:
+                conn = self._connection()
+                if not self._grade_confirmation_available(conn):
+                    raise ReportingUnavailable("grade_confirmation_unavailable")
+                if not self._student_profile_v7_available(conn):
+                    raise ReportingUnavailable("student_profile_v7_unavailable")
+
+                # Svi postojeći ciljevi se provjeravaju prije prvog upisa.
+                existing_ids = sorted({int(action.student_id)
+                                       for action in actions
+                                       if action.student_id is not None})
+                existing = {}
+                for chunk in self._chunks(existing_ids):
+                    placeholders = ",".join("?" * len(chunk))
+                    for row in _rows(conn.execute(
+                            "SELECT id, display_name, status, account_type "
+                            "FROM students WHERE id IN (%s)" % placeholders,
+                            tuple(chunk))):
+                        existing[int(row[0])] = row
+                if set(existing) != set(existing_ids):
+                    raise ReportingUnavailable("roster_student_missing")
+
+                current = self._current_grades(conn, existing_ids)
+                for action in actions:
+                    if action.student_id is None:
+                        continue
+                    row = existing[int(action.student_id)]
+                    _student_id, name, status, account_type = row
+                    if action.kind == "name":
+                        if name != action.expected_name:
+                            raise ReportingUnavailable("roster_name_changed")
+                        owner = _rows(conn.execute(
+                            "SELECT student_id FROM student_accounts "
+                            "WHERE provider = ? "
+                            "AND LOWER(TRIM(external_user_id)) = ?",
+                            (_THINKIFIC_PROVIDER, action.email)))
+                        if owner != [(int(action.student_id),)]:
+                            raise ReportingUnavailable("roster_identity_changed")
+                    if action.kind in ("archive", "reactivate"):
+                        normalized = str(status or "active").strip().lower() or "active"
+                        if normalized != action.expected_status:
+                            raise ReportingUnavailable("roster_status_changed")
+                    if action.kind == "archive" and account_type != ACCOUNT_TYPE_STUDENT:
+                        raise ReportingUnavailable("roster_archive_disabled")
+                    if action.kind == "grade":
+                        found = tuple(item["grade"] for item in
+                                      current.get(int(action.student_id), []))
+                        # Isti strogi legacy fallback kao u profilu i planeru.
+                        if not found:
+                            legacy = _rows(conn.execute(
+                                "SELECT grade, grade_confirmed_at, grade_source "
+                                "FROM students WHERE id = ?",
+                                (int(action.student_id),)))[0]
+                            from matbot import student_grades
+                            if student_grades.is_confirmed(*legacy):
+                                found = (int(legacy[0]),)
+                        if found != tuple(action.current_grades):
+                            raise ReportingUnavailable("roster_grade_changed")
+                        if account_type != ACCOUNT_TYPE_STUDENT:
+                            raise ReportingUnavailable("student_grade_disabled")
+
+                # Stari izvještaji bez sačuvanog naslova moraju dobiti staro
+                # ime prije prvog UPDATE-a profila u ovoj transakciji.
+                self._freeze_monthly_report_labels(conn, {
+                    int(action.student_id): action.expected_name
+                    for action in actions
+                    if action.kind == "name" and action.student_id is not None
+                })
+
+                created_by_email = {}
+                # Novi identiteti prvi: prijedlog razreda istog plana smije ih
+                # zatim referencirati, ali se bez ADD akcije ništa ne stvara.
+                for action in actions:
+                    if action.kind != "add":
+                        continue
+                    name = _clean_display_name(action.proposed_name)
+                    owner = _rows(conn.execute(
+                        "SELECT student_id FROM student_accounts "
+                        "WHERE provider = ? "
+                        "AND LOWER(TRIM(external_user_id)) = ?",
+                        (_THINKIFIC_PROVIDER, action.email)))
+                    if owner:
+                        raise ReportingUnavailable("roster_new_identity_taken")
+                    created = conn.execute(
+                        "INSERT INTO students (display_name, created_at, "
+                        "updated_at, last_seen_at) VALUES (?, CURRENT_TIMESTAMP, "
+                        "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", (name,))
+                    student_id = int(created.lastrowid)
+                    conn.execute(
+                        "INSERT INTO student_accounts (student_id, provider, "
+                        "external_user_id, created_at, last_seen_at) "
+                        "VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                        (student_id, _THINKIFIC_PROVIDER, action.email))
+                    created_by_email[action.email] = student_id
+                    counters["students_created"] += 1
+
+                for action in actions:
+                    if action.kind == "name":
+                        returned = _rows(conn.execute(
+                            "UPDATE students SET display_name = ?, "
+                            "updated_at = CURRENT_TIMESTAMP WHERE id = ? "
+                            "AND ((display_name IS NULL AND ? IS NULL) "
+                            "OR display_name = ?) RETURNING id",
+                            (action.proposed_name, int(action.student_id),
+                             action.expected_name, action.expected_name)))
+                        if returned != [(int(action.student_id),)]:
+                            raise ReportingUnavailable("roster_name_guard_failed")
+                        counters["names_updated"] += 1
+                    elif action.kind in ("archive", "reactivate"):
+                        target_status = ("archived" if action.kind == "archive"
+                                         else "active")
+                        returned = _rows(conn.execute(
+                            "UPDATE students SET status = ?, "
+                            "updated_at = CURRENT_TIMESTAMP WHERE id = ? "
+                            "AND LOWER(COALESCE(status, 'active')) = ? RETURNING id",
+                            (target_status, int(action.student_id),
+                             action.expected_status)))
+                        if returned != [(int(action.student_id),)]:
+                            raise ReportingUnavailable("roster_status_guard_failed")
+                        counter = ("students_archived" if action.kind == "archive"
+                                   else "students_reactivated")
+                        counters[counter] += 1
+
+                for action in actions:
+                    if action.kind != "grade":
+                        continue
+                    student_id = (int(action.student_id)
+                                  if action.student_id is not None
+                                  else created_by_email.get(action.email))
+                    if student_id is None:
+                        raise ReportingUnavailable("roster_grade_target_missing")
+                    grades = self._clean_current_grades(action.proposed_grades)
+                    conn.execute("DELETE FROM student_current_grades "
+                                 "WHERE student_id = ?", (student_id,))
+                    for grade in grades:
+                        conn.execute(
+                            "INSERT INTO student_current_grades "
+                            "(student_id, grade, confirmed_at, source) "
+                            "VALUES (?, ?, CURRENT_TIMESTAMP, ?)",
+                            (student_id, grade, GRADE_SOURCE_ADMIN))
+                    legacy_grade = grades[0] if len(grades) == 1 else None
+                    conn.execute(
+                        "UPDATE students SET grade = ?, "
+                        "grade_confirmed_at = CURRENT_TIMESTAMP, grade_source = ?, "
+                        "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (legacy_grade, GRADE_SOURCE_ADMIN, student_id))
+                    counters["grades_confirmed"] += 1
+
+                conn.commit()
+                return counters
+            except ReportingUnavailable:
+                self._safe_rollback()
+                raise
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "roster_apply_failed:" + type(exc).__name__, exc) from None
 
     # --- FAZA 3D: registar učenika i evidencija časova ----------------------
     # NEMA DRUGOG PROSTORA IMENA. Registar je pogled na POSTOJEĆU `students`
@@ -3268,7 +3587,13 @@ def _call_bounded(operation, timeout_s):
 
 def resolve_student(provider, external_user_id, display_name=None,
                     database=None):
-    """SIGURAN ulaz: `students.id` ili `None`. NIKAD ne baca i nikad ne čeka
+    """SIGURAN lookup: postojeći `students.id` ili `None`. NIKAD ne kreira.
+
+    Novi Thinkific identitet mora prvo odobriti osoblje kroz roster
+    reconciliation. Tutorski query parametar nije autentifikovan i zato ne smije
+    sam proširivati registar.
+
+    NIKAD ne baca i nikad ne čeka
     duže od `config.REPORTING_DB_TIMEOUT_S`.
 
     RAZRED SE NE PRIMA (verzija 4). Parametar je uklonjen namjerno, a ne
@@ -3300,8 +3625,7 @@ def resolve_student(provider, external_user_id, display_name=None,
         return cached
 
     ok, value = _call_bounded(
-        lambda: target.get_or_create_student(provider, external_user_id,
-                                             display_name=display_name),
+        lambda: target.find_student(provider_code, external),
         config.REPORTING_DB_TIMEOUT_S,
     )
     if ok:

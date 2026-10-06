@@ -47,6 +47,8 @@ class ExplodingDatabase:
         self.calls += 1
         raise self.error
 
+    find_student = get_or_create_student
+
     def touch_last_seen(self, *a, **kw):
         self.calls += 1
         raise self.error
@@ -71,6 +73,8 @@ class HangingDatabase:
         self.calls += 1
         self.released.wait(self.seconds)
         return 999
+
+    find_student = get_or_create_student
 
     def touch_last_seen(self, *a, **kw):
         self.calls += 1

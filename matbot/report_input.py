@@ -71,8 +71,9 @@ class ImportSummary:
     """Ne-PII sažetak za administratora."""
 
     FIELDS = ("files_received", "files_imported", "rows_seen", "students_created",
-              "students_reused", "snapshots_inserted", "snapshots_updated",
-              "sections_written", "invalid_rows", "grade_conflicts")
+              "students_reused", "students_skipped", "names_updated",
+              "snapshots_inserted", "snapshots_updated", "sections_written",
+              "invalid_rows", "grade_conflicts")
 
     def __init__(self, report_month):
         self.report_month = report_month
@@ -90,7 +91,8 @@ class ImportSummary:
         return data
 
 
-def import_progress_files(report_month, files, database=None):
+def import_progress_files(report_month, files, database=None, *,
+                          create_missing=True, refresh_existing_names=True):
     """Uvezi 1–4 Thinkific izvoza za JEDAN mjesec. Vraća `ImportSummary`.
 
     `files` je `{course_key: raw_bytes}` — administratorska stranica će imati
@@ -126,7 +128,9 @@ def import_progress_files(report_month, files, database=None):
             continue
 
         try:
-            _import_parsed_file(target, parsed, summary)
+            _import_parsed_file(
+                target, parsed, summary, create_missing=create_missing,
+                refresh_existing_names=refresh_existing_names)
         except reporting_db.ReportingUnavailable as error:
             summary.files.append({"course_key": course_key, "status": "failed",
                                   "code": error.code})
@@ -141,7 +145,8 @@ def import_progress_files(report_month, files, database=None):
     return summary
 
 
-def _import_parsed_file(target, parsed, summary):
+def _import_parsed_file(target, parsed, summary, *, create_missing=True,
+                        refresh_existing_names=True):
     """Predaj CIJELI provjereni fajl paketnom sloju u JEDNOJ transakciji.
 
     ZASTO NE RED-PO-RED (izmjereno, 34 ucenika x 7 sekcija): raniji put je zvao
@@ -177,10 +182,13 @@ def _import_parsed_file(target, parsed, summary):
         report_month=parsed.report_month, course_key=parsed.course_key,
         course_name=parsed.course_name, grade=parsed.grade,
         source_sha256=parsed.source_sha256,
-        provider=student_identity.PROVIDER_THINKIFIC_EMAIL, rows=prepared)
+        provider=student_identity.PROVIDER_THINKIFIC_EMAIL, rows=prepared,
+        create_missing=create_missing,
+        refresh_existing_names=refresh_existing_names)
 
-    for field in ("students_created", "students_reused", "snapshots_inserted",
-                  "snapshots_updated", "sections_written", "grade_conflicts"):
+    for field in ("students_created", "students_reused", "students_skipped",
+                  "names_updated", "snapshots_inserted", "snapshots_updated",
+                  "sections_written", "grade_conflicts"):
         setattr(summary, field, getattr(summary, field) + counters[field])
     if counters["grade_conflicts"]:
         # RAZLIKA SADRŽAJA, NE KVAR: toliko učenika ima potvrđen tekući razred
@@ -192,17 +200,14 @@ def _import_parsed_file(target, parsed, summary):
 
 
 def _resolve_student(target, email):
-    """Isti identitet kao Faza 1 — nikad nov prostor imena.
+    """Vrati samo već odobreni Thinkific identitet; nikad ga ne kreiraj.
 
-    Učenik koji NIKAD nije koristio MAT-BOT se ovdje kreira: izvještaj mu i dalje
-    pripada, jer napredak u kursu postoji nezavisno od tutora.
-
-    RAZRED SE NE PROSLJEĐUJE (verzija 4). Razred kursa je razred SADRŽAJA i
-    završava u snimku napretka; tekući školski razred potvrđuje administrator."""
-    existing = target.find_student(student_identity.PROVIDER_THINKIFIC_EMAIL, email)
-    student_id = target.get_or_create_student(
+    Funkcija je zadržana zbog uskog internog ugovora, iako paketni importer danas
+    radi vlastiti bulk lookup. Pravilo je isto na oba puta: roster reconciliation
+    je jedino mjesto gdje CSV smije napraviti novog učenika."""
+    student_id = target.find_student(
         student_identity.PROVIDER_THINKIFIC_EMAIL, email)
-    return student_id, existing is None
+    return student_id, False
 
 
 # ---------------------------------------------------------------------------

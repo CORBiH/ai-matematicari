@@ -136,6 +136,12 @@ def items(path):
 
 
 def enter(client, email=TEST_EMAIL):
+    normalized = student_identity.normalize_email(email)
+    database = reporting_db.get_database()
+    if normalized and isinstance(database, reporting_db.ReportingDatabase):
+        # Production tutor entry is lookup-only. These route tests explicitly
+        # seed the synthetic student as already approved by roster/admin flow.
+        database.get_or_create_student(PROVIDER_THINKIFIC_EMAIL, normalized)
     query = {student_identity.QUERY_PARAM: email} if email else {}
     response = client.get("/", query_string=query)
     body = response.get_data(as_text=True)

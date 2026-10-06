@@ -155,7 +155,10 @@ def resolve_student(identity):
     Razred zahtjeva je PARAMETAR TURNUSA (koji kurikulum koristiti sada), a
     `students.grade` je PROFIL (koji razred učenik zaista pohađa). Dvije
     različite tvrdnje — pa se više ne miješaju: profil pišu administrator i
-    Thinkific uvoz, nikad tutorski padajući meni.
+    roster reconciliation, nikad tutorski padajući meni.
+
+    Nepoznata adresa ostaje anonimna za izvještavanje dok je osoblje ne odobri.
+    Query parametar nije potpisan od Thinkifica i zato ne smije kreirati registar.
 
     `display_name` se NAMJERNO ne prosljeđuje: ime nije identitet, a MAT-BOT ga
     nema — iz e-maila se NE izvodi. Ostaje prazno dok ne dođe iz Thinkifica ili

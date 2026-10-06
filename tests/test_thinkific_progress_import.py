@@ -232,7 +232,7 @@ def test_thinkific_only_learner_is_created(db):
         [(PROVIDER_THINKIFIC_EMAIL, E1)]
 
 
-def test_display_name_is_filled_but_never_overwrites(db):
+def test_display_name_is_filled_and_blank_csv_never_erases_it(db):
     report_input.import_progress_files(
         "2026-09", {"grade_6": simple_csv(first="Ana", last="Anić")})
     assert rows(db, "SELECT display_name FROM students")[0][0] == "Ana Anić"
@@ -241,6 +241,38 @@ def test_display_name_is_filled_but_never_overwrites(db):
     report_input.import_progress_files(
         "2026-10", {"grade_6": simple_csv(first="", last="")})
     assert rows(db, "SELECT display_name FROM students")[0][0] == "Ana Anić"
+
+
+def test_latest_valid_thinkific_name_refreshes_same_email_without_duplicate(db):
+    first = report_input.import_progress_files(
+        "2026-08", {"grade_7": simple_csv(first="Amer", last="7")})
+    original_id = rows(db, "SELECT id FROM students")[0][0]
+
+    second = report_input.import_progress_files(
+        "2026-09", {"grade_8": build_csv(
+            [learner(E1, first="Amer", last="8")], sections=["ALGEBRA"])})
+
+    assert first.students_created == 1
+    assert second.students_created == 0 and second.students_reused == 1
+    assert second.names_updated == 1
+    assert rows(db, "SELECT id, display_name FROM students") == \
+        [(original_id, "Amer 8")]
+
+
+def test_unchanged_thinkific_name_does_not_touch_profile_updated_at(db):
+    report_input.import_progress_files(
+        "2026-08", {"grade_7": simple_csv(first="Amer", last="7")})
+    conn = libsql.connect(db)
+    conn.execute("UPDATE students SET updated_at = '2001-02-03 04:05:06'")
+    conn.commit()
+    conn.close()
+
+    summary = report_input.import_progress_files(
+        "2026-09", {"grade_7": simple_csv(first="Amer", last="7")})
+
+    assert summary.names_updated == 0
+    assert rows(db, "SELECT updated_at FROM students") == \
+        [("2001-02-03 04:05:06",)]
 
 
 def test_display_name_collapses_whitespace_and_ignores_blank_parts():

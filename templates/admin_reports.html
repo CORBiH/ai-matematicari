@@ -121,6 +121,8 @@
         <div class="stat"><b>{{ summary.rows_seen }}</b><span class="muted">redova</span></div>
         <div class="stat"><b>{{ summary.students_created }}</b><span class="muted">novih učenika</span></div>
         <div class="stat"><b>{{ summary.students_reused }}</b><span class="muted">postojećih učenika</span></div>
+        <div class="stat"><b>{{ summary.students_skipped }}</b><span class="muted">neodobrenih preskočeno</span></div>
+        <div class="stat"><b>{{ summary.names_updated }}</b><span class="muted">osvježenih imena</span></div>
         <div class="stat"><b>{{ summary.snapshots_inserted }}</b><span class="muted">novih snapshotova</span></div>
         <div class="stat"><b>{{ summary.snapshots_updated }}</b><span class="muted">ažuriranih snapshotova</span></div>
       </div>
@@ -156,24 +158,107 @@
         </div>
         {% for key, label, course_name in course_fields %}
         <div class="field">
-          <label for="{{ key }}">{{ course_name }} <span class="muted">(opcionalno)</span></label>
+          <label for="{{ key }}">{{ course_name }} <span class="muted">(obavezno za osvježavanje)</span></label>
           <input id="{{ key }}" name="{{ key }}" type="file" accept=".csv,text/csv">
         </div>
         {% endfor %}
       </div>
       <div class="actions" style="margin-top:.9rem">
-        <button type="submit" id="importBtn" {% if schema_state != 'ready' %}disabled{% endif %}>Importuj podatke</button>
-        <span class="muted text-small">Bar jedan CSV fajl je obavezan.</span>
+        <button type="button" id="rosterPreviewBtn" {% if schema_state != 'ready' %}disabled{% endif %}>Pregled promjena</button>
+        <span class="muted text-small">Za sigurno osvježavanje registra odaberi sva četiri trenutna CSV fajla.</span>
       </div>
     </form>
+    <section id="rosterPreview" style="margin-top:1rem" hidden aria-live="polite">
+      <div id="rosterPreviewMessage" class="banner"></div>
+      <div id="rosterSummary" class="grid"></div>
+      <div id="rosterIssues"></div>
+      <div id="rosterActions" class="table-wrap" style="margin-top:1rem"></div>
+      <div class="actions" style="margin-top:1rem">
+        <button type="button" id="rosterApplyBtn" hidden>Primijeni označene promjene i uvezi napredak</button>
+        <span class="muted text-small">Promjene razreda i arhiviranje nikad nisu unaprijed označeni.</span>
+      </div>
+    </section>
   </div>
 </details>
 
 <script>
 (function(){
-  var form=document.getElementById('importForm'),btn=document.getElementById('importBtn');
-  if(!form||!btn)return;
-  form.addEventListener('submit',function(){if(btn.disabled)return;setTimeout(function(){btn.disabled=true;btn.textContent='Importujem…';},0);});
+  'use strict';
+  var form=document.getElementById('importForm');
+  var previewButton=document.getElementById('rosterPreviewBtn');
+  var applyButton=document.getElementById('rosterApplyBtn');
+  var panel=document.getElementById('rosterPreview');
+  var message=document.getElementById('rosterPreviewMessage');
+  var summary=document.getElementById('rosterSummary');
+  var issues=document.getElementById('rosterIssues');
+  var actions=document.getElementById('rosterActions');
+  var planId='';
+  if(!form||!previewButton||!applyButton)return;
+
+  function clear(node){while(node.firstChild)node.removeChild(node.firstChild);}
+  function text(tag,value,className){var node=document.createElement(tag);node.textContent=value;if(className)node.className=className;return node;}
+  function setBusy(button,busy,label){button.disabled=busy;if(label)button.textContent=label;}
+  function showError(value){panel.hidden=false;message.className='banner err';message.textContent=value;applyButton.hidden=true;planId='';}
+  function stat(value,label){var box=text('div','', 'stat');box.appendChild(text('b',String(value)));box.appendChild(text('span',label,'muted'));return box;}
+
+  function render(data){
+    panel.hidden=false;clear(summary);clear(issues);clear(actions);
+    var s=data.summary||{};
+    summary.appendChild(stat(s.unchanged||0,'bez promjena'));
+    summary.appendChild(stat(s.name_changes||0,'promijenjenih imena'));
+    summary.appendChild(stat(s.grade_suggestions||0,'prijedloga razreda'));
+    summary.appendChild(stat(s.new_students||0,'novih učenika'));
+    summary.appendChild(stat(s.missing_students||0,'nije pronađeno'));
+    (data.blockers||[]).forEach(function(value){issues.appendChild(text('div',value,'banner err'));});
+    (data.notices||[]).forEach(function(value){issues.appendChild(text('div',value,'banner warn'));});
+    if(!data.apply_allowed){message.className='banner err';message.textContent='Pregled je blokiran. Ispravi označene probleme i ponovi upload.';applyButton.hidden=true;planId='';return;}
+    message.className='banner ok';message.textContent='Pregled je spreman. Provjeri svaku označenu promjenu prije primjene.';
+    planId=data.plan_id||'';
+    var rows=data.actions||[];
+    if(rows.length){
+      var table=text('table','', 'responsive-table');
+      var head=document.createElement('thead'),hr=document.createElement('tr');
+      ['Izbor','Učenik','Promjena','Trenutno','Poslije'].forEach(function(value){hr.appendChild(text('th',value));});
+      head.appendChild(hr);table.appendChild(head);
+      var body=document.createElement('tbody');
+      rows.forEach(function(item){
+        var row=document.createElement('tr');
+        var choose=document.createElement('td');choose.setAttribute('data-label','Izbor');
+        var checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.className='roster-action';checkbox.value=item.key;checkbox.checked=!!item.default_selected;checkbox.setAttribute('aria-label','Odaberi promjenu za '+item.label);choose.appendChild(checkbox);row.appendChild(choose);
+        var who=document.createElement('td');who.className='cell-primary';who.appendChild(text('span',item.label,'cell-title'));if(item.email)who.appendChild(text('span',item.email,'cell-meta'));if(item.warning)who.appendChild(text('span',item.warning,'cell-meta text-warning'));row.appendChild(who);
+        var labels={name:'Ažuriraj ime',add:'Dodaj',archive:'Arhiviraj',reactivate:'Ponovo aktiviraj',grade:'Potvrdi razred'};
+        row.appendChild(text('td',labels[item.kind]||item.kind));row.lastChild.setAttribute('data-label','Promjena');
+        row.appendChild(text('td',item.before||'—'));row.lastChild.setAttribute('data-label','Trenutno');
+        row.appendChild(text('td',item.after||'—'));row.lastChild.setAttribute('data-label','Poslije');
+        body.appendChild(row);
+      });
+      table.appendChild(body);actions.appendChild(table);
+    }else actions.appendChild(text('div','Nema promjena registra. Napredak iz četiri fajla ipak može biti uvezen.','empty'));
+    applyButton.hidden=false;
+  }
+
+  form.addEventListener('submit',function(event){event.preventDefault();previewButton.click();});
+
+  previewButton.addEventListener('click',async function(){
+    setBusy(previewButton,true,'Pregledam…');panel.hidden=false;message.className='banner';message.textContent='Čitam četiri izvoza i upoređujem registar…';applyButton.hidden=true;
+    try{
+      var response=await fetch('{{ url_for("admin_reports.preview_roster") }}',{method:'POST',body:new FormData(form)});
+      var data=await response.json();if(!response.ok||data.status==='error')throw new Error(data.message||'Pregled nije uspio.');render(data);
+    }catch(error){showError(error.message||'Pregled nije uspio.');}
+    finally{setBusy(previewButton,false,'Pregled promjena');}
+  });
+
+  applyButton.addEventListener('click',async function(){
+    if(!planId)return;setBusy(applyButton,true,'Primjenjujem…');
+    var payload=new FormData(form);payload.append('plan_id',planId);
+    document.querySelectorAll('.roster-action:checked').forEach(function(box){payload.append('action_keys',box.value);});
+    try{
+      var response=await fetch('{{ url_for("admin_reports.apply_roster") }}',{method:'POST',body:payload});
+      var data=await response.json();if(!response.ok||data.status==='error')throw new Error(data.message||'Primjena nije uspjela.');
+      message.className=data.status==='applied'?'banner ok':'banner warn';message.textContent=data.message;applyButton.hidden=true;planId='';
+    }catch(error){showError(error.message||'Primjena nije uspjela.');}
+    finally{setBusy(applyButton,false,'Primijeni označene promjene i uvezi napredak');}
+  });
 })();
 </script>
 {% endblock %}

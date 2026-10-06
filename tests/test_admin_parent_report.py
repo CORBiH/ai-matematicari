@@ -18,11 +18,12 @@ import zipfile
 import pytest
 from werkzeug.datastructures import MultiDict
 
-from matbot import (activity, parent_report, report_facts, reporting_db,
-                    reporting_schema)
+from matbot import (activity, parent_report, report_facts, report_input,
+                    reporting_db, reporting_schema)
 from matbot.student_identity import PROVIDER_THINKIFIC_EMAIL
 
 from tests.test_parent_report import good_narrative, payload
+from tests.fixtures.thinkific import build_csv, learner
 from tests.test_thinkific_progress_import import build_v1, migrate, rows
 
 libsql = pytest.importorskip("libsql")
@@ -229,6 +230,47 @@ def test_pdf_download_makes_no_model_call(admin, db, student, counter):
     assert response.status_code == 200
     assert response.mimetype == "application/pdf"
     assert response.data.startswith(b"%PDF")
+    assert counter.calls == 0
+
+
+def test_saved_report_keeps_its_name_after_current_roster_name_changes(
+        admin, db, student, counter):
+    report_input.import_progress_files("2026-07", {"grade_6": build_csv([
+        learner("learner@example.com", first="Staro", last="Ime 6")])})
+    assert _generate(admin, student).status_code == 302
+    assert counter.calls == 1
+
+    report_input.import_progress_files("2026-09", {"grade_7": build_csv([
+        learner("learner@example.com", first="Novo", last="Ime 7")])})
+    assert rows(db, "SELECT display_name FROM students") == [("Novo Ime 7",)]
+
+    response = admin.get(
+        "/admin/reports/student/%d/pdf?month=2026-08" % student)
+    text = "\n".join(page.extract_text() for page in
+                     pypdf.PdfReader(io.BytesIO(response.data)).pages)
+    assert "Staro Ime 6" in text
+    assert "Novo Ime 7" not in text
+
+
+def test_legacy_saved_report_gets_its_old_name_frozen_before_thinkific_rename(
+        admin, db, student, counter):
+    report_input.import_progress_files("2026-07", {"grade_6": build_csv([
+        learner("learner@example.com", first="Historijsko", last="Ime 6")])})
+    _seed_draft(student)  # stari format: snapshot još nema student.label
+    assert parent_report.load_saved(student, "2026-08")["snapshot"].get(
+        "student") is None
+
+    report_input.import_progress_files("2026-09", {"grade_7": build_csv([
+        learner("learner@example.com", first="Trenutno", last="Ime 7")])})
+
+    saved = parent_report.load_saved(student, "2026-08")
+    assert saved["snapshot"]["student"]["label"] == "Historijsko Ime 6"
+    response = admin.get(
+        "/admin/reports/student/%d/pdf?month=2026-08" % student)
+    text = "\n".join(page.extract_text() for page in
+                     pypdf.PdfReader(io.BytesIO(response.data)).pages)
+    assert "Historijsko Ime 6" in text
+    assert "Trenutno Ime 7" not in text
     assert counter.calls == 0
 
 
