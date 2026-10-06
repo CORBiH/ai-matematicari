@@ -209,13 +209,51 @@ def test_union_of_four_courses_does_not_archive_student_in_any_one_export(databa
 
 def test_missing_student_is_only_archived_when_explicitly_selected(database):
     target, path = database
+    conn = libsql.connect(path)
+    conn.execute("DROP TABLE monthly_reports")
+    conn.execute(reporting_schema.MONTHLY_REPORTS_DDL)
+    conn.execute(reporting_schema.MONTHLY_REPORTS_INDEX_DDL)
+    conn.commit()
+    conn.close()
+
     report_input.import_progress_files(
         "2026-08", {"grade_7": build_csv([
             learner("otisao@example.com", first="Otišao", last="7")])},
         database=target)
     student_id = rows(path, "SELECT id FROM students")[0][0]
-    before_snapshots = rows(
-        path, "SELECT COUNT(*) FROM thinkific_progress_snapshots")[0][0]
+    report_id = target.save_monthly_report(
+        student_id=student_id, report_month="2026-08",
+        metrics_json=json.dumps({"facts": {"marker": "archive-history"}}),
+        ai_summary=json.dumps({"summary": "historijski"}),
+        instructor_comment="Sačuvaj historiju.")
+    conn = libsql.connect(path)
+    conn.execute(
+        "INSERT INTO learning_activity "
+        "(student_id, source, event_type, event_key, grade, occurred_at) "
+        "VALUES (?, 'matbot', 'lesson_started', 'archive-event', 7, "
+        "'2026-08-10 10:00:00')", (student_id,))
+    conn.execute(
+        "INSERT INTO assessment_attempts "
+        "(student_id, source, assessment_type, external_attempt_id, grade) "
+        "VALUES (?, 'matbot', 'kontrolni', 'archive-assessment', 7)",
+        (student_id,))
+    conn.commit()
+    conn.close()
+    preserved = {
+        "accounts": rows(
+            path, "SELECT id, student_id, provider, external_user_id "
+                  "FROM student_accounts"),
+        "snapshots": rows(
+            path, "SELECT id, student_id, import_id, report_month, course_key "
+                  "FROM thinkific_progress_snapshots"),
+        "reports": rows(
+            path, "SELECT id, student_id, report_month FROM monthly_reports"),
+        "activity": rows(
+            path, "SELECT id, student_id, event_key FROM learning_activity"),
+        "assessments": rows(
+            path, "SELECT id, student_id, external_attempt_id "
+                  "FROM assessment_attempts"),
+    }
 
     plan = thinkific_roster.build_plan(parsed("2026-09"), target)
     archive = action(plan, thinkific_roster.ARCHIVE, "Otišao 7")
@@ -229,8 +267,160 @@ def test_missing_student_is_only_archived_when_explicitly_selected(database):
     target.apply_roster_reconciliation([archive])
     assert rows(path, "SELECT id, status FROM students") == \
         [(student_id, "archived")]
-    assert rows(path, "SELECT COUNT(*) FROM thinkific_progress_snapshots")[0][0] \
-        == before_snapshots
+    assert preserved["reports"] == [(report_id, student_id, "2026-08")]
+    assert rows(path, "SELECT id, student_id, provider, external_user_id "
+                      "FROM student_accounts") == preserved["accounts"]
+    assert rows(path, "SELECT id, student_id, import_id, report_month, "
+                      "course_key FROM thinkific_progress_snapshots") == \
+        preserved["snapshots"]
+    assert rows(path, "SELECT id, student_id, report_month "
+                      "FROM monthly_reports") == preserved["reports"]
+    assert rows(path, "SELECT id, student_id, event_key "
+                      "FROM learning_activity") == preserved["activity"]
+    assert rows(path, "SELECT id, student_id, external_attempt_id "
+                      "FROM assessment_attempts") == preserved["assessments"]
+
+
+def test_name_grade_and_archive_apply_in_one_transaction(database):
+    target, path = database
+    promoted_id = target.get_or_create_student(
+        "thinkific_email", "promocija@example.com", "Promocija 7")
+    target.set_student_grade(promoted_id, 7)
+    archived_id = target.get_or_create_student(
+        "thinkific_email", "arhiva@example.com", "Arhiva 7")
+    target.set_student_grade(archived_id, 7)
+    current = parsed("2026-09", {
+        "grade_8": [learner(
+            "promocija@example.com", first="Promocija", last="8")],
+    })
+    plan = thinkific_roster.build_plan(current, target)
+    rename = action(plan, thinkific_roster.NAME, "Promocija 8")
+    grade = action(plan, thinkific_roster.GRADE, "Promocija 8")
+    archive = action(plan, thinkific_roster.ARCHIVE, "Arhiva 7")
+
+    result = target.apply_roster_reconciliation([rename, grade, archive])
+
+    assert result == {
+        "names_updated": 1,
+        "students_created": 0,
+        "students_archived": 1,
+        "students_reactivated": 0,
+        "grades_confirmed": 1,
+    }
+    assert rows(path, "SELECT id, display_name, status FROM students "
+                      "ORDER BY id") == [
+        (promoted_id, "Promocija 8", "active"),
+        (archived_id, "Arhiva 7", "archived"),
+    ]
+    assert rows(path, "SELECT student_id, grade FROM student_current_grades "
+                      "ORDER BY student_id") == [
+        (promoted_id, 8), (archived_id, 7)]
+    assert rows(path, "SELECT COUNT(*) FROM student_accounts")[0][0] == 2
+
+
+def test_late_archive_failure_rolls_back_names_statuses_and_selected_grade(
+        database):
+    target, path = database
+    promoted_id = target.get_or_create_student(
+        "thinkific_email", "rollback-name@example.com", "Prije 7")
+    target.set_student_grade(promoted_id, 7)
+    first_archive_id = target.get_or_create_student(
+        "thinkific_email", "archive-a@example.com", "Arhiva A 7")
+    second_archive_id = target.get_or_create_student(
+        "thinkific_email", "archive-z@example.com", "Arhiva Z 7")
+    current = parsed("2026-09", {
+        "grade_8": [learner(
+            "rollback-name@example.com", first="Poslije", last="8")],
+    })
+    plan = thinkific_roster.build_plan(current, target)
+    selected = [
+        action(plan, thinkific_roster.NAME, "Poslije 8"),
+        action(plan, thinkific_roster.GRADE, "Poslije 8"),
+        action(plan, thinkific_roster.ARCHIVE, "Arhiva A 7"),
+        action(plan, thinkific_roster.ARCHIVE, "Arhiva Z 7"),
+    ]
+    conn = libsql.connect(path)
+    conn.execute(
+        "CREATE TRIGGER reject_second_archive BEFORE UPDATE OF status "
+        "ON students WHEN NEW.id = %d BEGIN "
+        "SELECT RAISE(ABORT, 'synthetic archive failure'); END"
+        % second_archive_id)
+    conn.commit()
+    conn.close()
+
+    with pytest.raises(reporting_db.ReportingUnavailable) as caught:
+        target.apply_roster_reconciliation(selected)
+
+    assert caught.value.code == "roster_apply_failed:ValueError"
+    assert caught.value.phase == "update_name_or_status"
+    assert caught.value.action_type == "archive"
+    assert rows(path, "SELECT id, display_name, status FROM students "
+                      "ORDER BY id") == [
+        (promoted_id, "Prije 7", "active"),
+        (first_archive_id, "Arhiva A 7", "active"),
+        (second_archive_id, "Arhiva Z 7", "active"),
+    ]
+    assert rows(path, "SELECT student_id, grade FROM student_current_grades") \
+        == [(promoted_id, 7)]
+
+
+def test_archive_reactivate_and_name_avoid_mutation_returning_fetch(database):
+    target, path = database
+    student_id = target.get_or_create_student(
+        "thinkific_email", "remote-shape@example.com", "Remote 7")
+    target.set_student_grade(student_id, 7)
+    archive_plan = thinkific_roster.build_plan(parsed("2026-09"), target)
+    archive = action(archive_plan, thinkific_roster.ARCHIVE, "Remote 7")
+    delegate = target._connection()
+
+    class FailingReturningCursor:
+        def __init__(self, cursor):
+            self.cursor = cursor
+
+        def __getattr__(self, name):
+            return getattr(self.cursor, name)
+
+        def fetchall(self):
+            raise ValueError("remote mutation result cannot be decoded")
+
+    class RemoteShapeConnection:
+        def __init__(self, connection):
+            self.connection = connection
+            self.update_sql = []
+
+        def __getattr__(self, name):
+            return getattr(self.connection, name)
+
+        def execute(self, sql, parameters=()):
+            cursor = self.connection.execute(sql, parameters)
+            normalized = " ".join(sql.upper().split())
+            if normalized.startswith("UPDATE STUDENTS"):
+                self.update_sql.append(normalized)
+                if " RETURNING " in normalized:
+                    return FailingReturningCursor(cursor)
+            return cursor
+
+    remote_shape = RemoteShapeConnection(delegate)
+    target._conn = remote_shape
+
+    target.apply_roster_reconciliation([archive])
+    reactivation_plan = thinkific_roster.build_plan(parsed("2026-09", {
+        "grade_7": [learner(
+            "remote-shape@example.com", first="Remote", last="7")],
+    }), target)
+    target.apply_roster_reconciliation([
+        action(reactivation_plan, thinkific_roster.REACTIVATE, "Remote 7")])
+    rename_plan = thinkific_roster.build_plan(parsed("2026-09", {
+        "grade_7": [learner(
+            "remote-shape@example.com", first="Remote Novo", last="7")],
+    }), target)
+    target.apply_roster_reconciliation([
+        action(rename_plan, thinkific_roster.NAME, "Remote Novo 7")])
+
+    assert rows(path, "SELECT id, display_name, status FROM students") == [
+        (student_id, "Remote Novo 7", "active")]
+    assert remote_shape.update_sql
+    assert all(" RETURNING " not in sql for sql in remote_shape.update_sql)
 
 
 def test_archived_student_requires_explicit_reactivation_without_other_mutation(

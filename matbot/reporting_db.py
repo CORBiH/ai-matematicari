@@ -1761,27 +1761,31 @@ class ReportingDatabase:
                 for action in actions:
                     if action.kind == "name":
                         action_type = "name"
-                        returned = _rows(conn.execute(
+                        # Udaljeni libSQL kursor može pasti dok prazni rezultat
+                        # ``UPDATE ... RETURNING``. Ovdje red nije podatak nego
+                        # optimistic-lock guard, pa je DB-API ``rowcount`` tačan
+                        # ugovor i ne uvodi mutation rezultat u ``_rows``.
+                        updated = conn.execute(
                             "UPDATE students SET display_name = ?, "
                             "updated_at = CURRENT_TIMESTAMP WHERE id = ? "
                             "AND ((display_name IS NULL AND ? IS NULL) "
-                            "OR display_name = ?) RETURNING id",
+                            "OR display_name = ?)",
                             (action.proposed_name, int(action.student_id),
-                             action.expected_name, action.expected_name)))
-                        if returned != [(int(action.student_id),)]:
+                             action.expected_name, action.expected_name))
+                        if updated.rowcount != 1:
                             raise ReportingUnavailable("roster_name_guard_failed")
                         counters["names_updated"] += 1
                     elif action.kind in ("archive", "reactivate"):
                         action_type = action.kind
                         target_status = ("archived" if action.kind == "archive"
                                          else "active")
-                        returned = _rows(conn.execute(
+                        updated = conn.execute(
                             "UPDATE students SET status = ?, "
                             "updated_at = CURRENT_TIMESTAMP WHERE id = ? "
-                            "AND LOWER(COALESCE(status, 'active')) = ? RETURNING id",
+                            "AND LOWER(COALESCE(status, 'active')) = ?",
                             (target_status, int(action.student_id),
-                             action.expected_status)))
-                        if returned != [(int(action.student_id),)]:
+                             action.expected_status))
+                        if updated.rowcount != 1:
                             raise ReportingUnavailable("roster_status_guard_failed")
                         counter = ("students_archived" if action.kind == "archive"
                                    else "students_reactivated")
