@@ -441,6 +441,76 @@ def test_roster_preview_and_apply_refresh_name_but_not_unconfirmed_grade(admin, 
     assert rows(db, "SELECT grade FROM student_current_grades") == [(7,)]
 
 
+def test_roster_nonstudent_grade_is_informational_and_forged_selection_fails(
+        admin, db):
+    database = reporting_db.get_database()
+    student_id = database.get_or_create_student(
+        PROVIDER_THINKIFIC_EMAIL, "vedat@example.com", "Vedat 7 PODRŠKA")
+    database.set_student_grade(student_id, 6)
+    database.set_student_account_types(
+        [student_id], reporting_db.ACCOUNT_TYPE_SUPPORT)
+    current = {
+        "grade_7": [learner(
+            "vedat@example.com", first="Vedat", last="7 PODRŠKA")],
+    }
+
+    preview = _roster_upload(
+        admin, "/admin/reports/roster/preview", current).get_json()
+    proposal = next(item for item in preview["actions"]
+                    if item["kind"] == "grade")
+    assert proposal["selectable"] is False
+    assert proposal["default_selected"] is False
+    assert proposal["requires_explicit_confirmation"] is False
+    assert proposal["unavailable_reason"] == \
+        "Razred se može potvrditi samo redovnom učeniku."
+
+    forged = _roster_upload(
+        admin, "/admin/reports/roster/apply", current,
+        plan_id=preview["plan_id"], action_keys=[proposal["key"]])
+
+    assert forged.status_code == 400
+    assert forged.get_json()["message"] == "Izbor promjena nije ispravan."
+    assert rows(db, "SELECT id, display_name, account_type FROM students") == [
+        (student_id, "Vedat 7 PODRŠKA", reporting_db.ACCOUNT_TYPE_SUPPORT)]
+    assert rows(db, "SELECT grade FROM student_current_grades") == [(6,)]
+
+
+def test_roster_valid_student_grade_explicit_selection_succeeds(admin, db):
+    database = reporting_db.get_database()
+    student_id = database.get_or_create_student(
+        PROVIDER_THINKIFIC_EMAIL, "ucenik@example.com", "Učenik 7")
+    database.set_student_grade(student_id, 7)
+    current = {
+        "grade_8": [learner(
+            "ucenik@example.com", first="Učenik", last="8")],
+    }
+
+    preview = _roster_upload(
+        admin, "/admin/reports/roster/preview", current).get_json()
+    proposal = next(item for item in preview["actions"]
+                    if item["kind"] == "grade")
+    assert proposal["selectable"] is True
+    assert proposal["default_selected"] is False
+
+    applied = _roster_upload(
+        admin, "/admin/reports/roster/apply", current,
+        plan_id=preview["plan_id"], action_keys=[proposal["key"]])
+
+    assert applied.status_code == 200
+    assert applied.get_json()["status"] == "applied"
+    assert rows(db, "SELECT grade FROM student_current_grades") == [(8,)]
+    assert rows(db, "SELECT display_name FROM students") == [("Učenik 7",)]
+
+
+def test_roster_ui_never_renders_or_submits_unavailable_action_checkbox(
+        admin, db):
+    html = admin.get("/admin/reports").get_data(as_text=True)
+
+    assert "if(item.selectable===false)" in html
+    assert "Nije dostupno" in html
+    assert ".roster-action:checked:not(:disabled)" in html
+
+
 def test_roster_apply_logs_only_safe_failure_diagnostics(
         admin, db, monkeypatch, caplog):
     _upload(admin, month="2026-08", files={

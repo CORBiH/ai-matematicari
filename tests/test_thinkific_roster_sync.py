@@ -59,6 +59,7 @@ def test_changed_name_is_default_but_grade_change_requires_confirmation(database
     promotion = action(plan, thinkific_roster.GRADE, "Amer 8")
     assert rename.default_selected is True
     assert promotion.default_selected is False
+    assert promotion.selectable is True
     assert (promotion.current_grades, promotion.proposed_grades) == ((7,), (8,))
 
     target.apply_roster_reconciliation([rename])
@@ -72,6 +73,58 @@ def test_changed_name_is_default_but_grade_change_requires_confirmation(database
     target.apply_roster_reconciliation([
         action(fresh, thinkific_roster.GRADE, "Amer 8")])
     assert rows(path, "SELECT grade FROM student_current_grades") == [(8,)]
+
+
+@pytest.mark.parametrize(("account_type", "current_grades", "selectable"), [
+    (reporting_db.ACCOUNT_TYPE_STUDENT, (), True),
+    (reporting_db.ACCOUNT_TYPE_STUDENT, (6,), True),
+    (reporting_db.ACCOUNT_TYPE_STUDENT, (6, 7), True),
+    (reporting_db.ACCOUNT_TYPE_SUPPORT, (6,), False),
+    (reporting_db.ACCOUNT_TYPE_TEST, (6,), False),
+])
+def test_grade_proposal_selectability_matches_apply_account_type_rule(
+        database, account_type, current_grades, selectable):
+    target, _path = database
+    email = "%s-%d@example.com" % (account_type.lower(), len(current_grades))
+    student_id = target.get_or_create_student(
+        "thinkific_email", email, "Profil bez razreda")
+    if current_grades:
+        target.set_student_grades(student_id, current_grades)
+    if account_type != reporting_db.ACCOUNT_TYPE_STUDENT:
+        target.set_student_account_types([student_id], account_type)
+
+    plan = thinkific_roster.build_plan(parsed("2026-09", {
+        "grade_9": [learner(email, first="Profil", last="9")],
+    }), target)
+    proposal = action(plan, thinkific_roster.GRADE, "Profil 9")
+
+    assert proposal.selectable is selectable
+    assert proposal.default_selected is False
+    assert bool(proposal.unavailable_reason) is (not selectable)
+    assert proposal.public()["requires_explicit_confirmation"] is selectable
+
+
+def test_forged_nonstudent_grade_action_remains_rejected_by_database(database):
+    target, path = database
+    student_id = target.get_or_create_student(
+        "thinkific_email", "podrska@example.com", "Vedat 7 PODRŠKA")
+    target.set_student_grade(student_id, 6)
+    target.set_student_account_types(
+        [student_id], reporting_db.ACCOUNT_TYPE_SUPPORT)
+    plan = thinkific_roster.build_plan(parsed("2026-09", {
+        "grade_7": [learner(
+            "podrska@example.com", first="Vedat", last="7 PODRŠKA")],
+    }), target)
+    proposal = action(plan, thinkific_roster.GRADE, "Vedat 7 PODRŠKA")
+    assert proposal.selectable is False
+
+    with pytest.raises(reporting_db.ReportingUnavailable) as caught:
+        target.apply_roster_reconciliation([proposal])
+
+    assert caught.value.code == "student_grade_disabled"
+    assert caught.value.phase == "validate_action"
+    assert caught.value.action_type == "grade"
+    assert rows(path, "SELECT grade FROM student_current_grades") == [(6,)]
 
 
 def test_roster_failure_carries_phase_and_action_without_partial_write(
@@ -221,6 +274,7 @@ def test_archived_student_requires_explicit_reactivation_without_other_mutation(
     grade = action(plan, thinkific_roster.GRADE, "Arhiviran 8")
     assert reactivate.default_selected is False
     assert grade.default_selected is False
+    assert grade.selectable is True
 
     defaults = [item for item in plan.actions if item.default_selected]
     target.apply_roster_reconciliation(defaults)

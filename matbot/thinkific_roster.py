@@ -88,6 +88,8 @@ class RosterAction:
     expected_status: str | None = None
     current_grades: tuple[int, ...] = ()
     proposed_grades: tuple[int, ...] = ()
+    selectable: bool = True
+    unavailable_reason: str = ""
     warning: str = ""
 
     def public(self):
@@ -100,8 +102,10 @@ class RosterAction:
             "before": self.before,
             "after": self.after,
             "default_selected": self.default_selected,
-            "requires_explicit_confirmation": self.kind in (
+            "selectable": self.selectable,
+            "requires_explicit_confirmation": self.selectable and self.kind in (
                 ARCHIVE, REACTIVATE, GRADE),
+            "unavailable_reason": self.unavailable_reason,
             "warning": self.warning,
         }
 
@@ -120,6 +124,8 @@ class RosterAction:
             "expected_status": self.expected_status,
             "current_grades": list(self.current_grades),
             "proposed_grades": list(self.proposed_grades),
+            "selectable": self.selectable,
+            "unavailable_reason": self.unavailable_reason,
             "warning": self.warning,
         }
 
@@ -330,13 +336,20 @@ def build_plan(parsed_files, database):
             proposed_name or existing_name)
         current = tuple(student.get("grades") or ())
         if suggested is not None and current != (suggested,):
+            grade_selectable = (
+                student.get("account_type") ==
+                reporting_db.ACCOUNT_TYPE_STUDENT)
             actions.append(RosterAction(
                 key=_subject_key(GRADE, student_id), kind=GRADE,
                 student_id=student_id, email=email, label=label,
                 before=_grade_label(current),
                 after="%d. razred" % suggested,
                 default_selected=False, current_grades=current,
-                proposed_grades=(suggested,)))
+                proposed_grades=(suggested,),
+                selectable=grade_selectable,
+                unavailable_reason=(
+                    "Razred se može potvrditi samo redovnom učeniku."
+                    if not grade_selectable else "")))
             changed = True
         if not changed:
             unchanged += 1
@@ -376,6 +389,8 @@ def selected_actions(plan, keys):
     if any(key not in available for key in requested):
         raise RosterPlanError("unknown_action")
     chosen = [available[key] for key in requested]
+    if any(not action.selectable for action in chosen):
+        raise RosterPlanError("action_not_selectable")
     selected_adds = {action.email for action in chosen if action.kind == ADD}
     if any(action.kind == GRADE and action.student_id is None
            and action.email not in selected_adds for action in chosen):

@@ -296,8 +296,8 @@
       rows.forEach(function(item){
         var row=document.createElement('tr');
         var choose=document.createElement('td');choose.setAttribute('data-label','Izbor');
-        var checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.className='roster-action';checkbox.value=item.key;checkbox.checked=!!item.default_selected;checkbox.setAttribute('aria-label','Odaberi promjenu za '+item.label);choose.appendChild(checkbox);row.appendChild(choose);
-        var who=document.createElement('td');who.className='cell-primary';who.appendChild(text('span',item.label,'cell-title'));if(item.email)who.appendChild(text('span',item.email,'cell-meta'));if(item.warning)who.appendChild(text('span',item.warning,'cell-meta text-warning'));row.appendChild(who);
+        if(item.selectable===false){choose.appendChild(text('span','Nije dostupno','cell-meta text-warning'));}else{var checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.className='roster-action';checkbox.value=item.key;checkbox.checked=!!item.default_selected;checkbox.setAttribute('aria-label','Odaberi promjenu za '+item.label);choose.appendChild(checkbox);}row.appendChild(choose);
+        var who=document.createElement('td');who.className='cell-primary';who.appendChild(text('span',item.label,'cell-title'));if(item.email)who.appendChild(text('span',item.email,'cell-meta'));if(item.unavailable_reason)who.appendChild(text('span',item.unavailable_reason,'cell-meta text-warning'));if(item.warning)who.appendChild(text('span',item.warning,'cell-meta text-warning'));row.appendChild(who);
         var labels={name:'Ažuriraj ime',add:'Dodaj',archive:'Arhiviraj',reactivate:'Ponovo aktiviraj',grade:'Potvrdi razred'};
         row.appendChild(text('td',labels[item.kind]||item.kind));row.lastChild.setAttribute('data-label','Promjena');
         row.appendChild(text('td',item.before||'—'));row.lastChild.setAttribute('data-label','Trenutno');
@@ -339,7 +339,7 @@
   applyButton.addEventListener('click',async function(){
     if(!planId)return;setBusy(applyButton,true,'Primjenjujem…');
     var payload=mappedPayload();payload.append('plan_id',planId);
-    document.querySelectorAll('.roster-action:checked').forEach(function(box){payload.append('action_keys',box.value);});
+    document.querySelectorAll('.roster-action:checked:not(:disabled)').forEach(function(box){payload.append('action_keys',box.value);});
     try{
       var response=await fetch('{{ url_for("admin_reports.apply_roster") }}',{method:'POST',body:payload});
       var data=await response.json();if(!response.ok||data.status==='error')throw new Error(data.message||'Primjena nije uspjela.');
