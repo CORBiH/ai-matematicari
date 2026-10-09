@@ -1066,6 +1066,8 @@ def _generate_one_report(student_id, month, *, replace):
     key = (int(student_id), month)
     with _REPORT_GENERATION_INFLIGHT_LOCK:
         if key in _REPORT_GENERATION_INFLIGHT:
+            logger.info(
+                "admin_report_generate_blocked code=already_in_progress")
             payload = report_input.build_report_input(student_id, month)
             return payload, "error", ERROR_GENERATION_IN_PROGRESS
         _REPORT_GENERATION_INFLIGHT.add(key)

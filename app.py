@@ -6,6 +6,7 @@ import logging
 import os
 
 from matbot import admin_auth, auth, config, release_config, student_identity
+from matbot.application_logging import configure_application_logging
 from matbot.admin_reports import admin_reports_bp
 from matbot.admin_sessions import admin_sessions_bp
 from matbot.admin_students import admin_students_bp
@@ -14,6 +15,7 @@ from matbot.request_limits import BoundedInMemoryRequest
 from matbot.topics import topics_response
 
 config.require_secret_key(config.SECRET_KEY)
+configure_application_logging()
 
 # JEDAN red na startu s EFEKTIVNOM konfiguracijom — nikad tajna.
 #

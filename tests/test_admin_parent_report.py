@@ -14,6 +14,7 @@ uređuje tekst klikće često, a svaki klik koji bi tiho platio poziv bio bi kva
 koji se primijeti tek na računu.
 """
 import io
+import logging
 import re
 import threading
 import zipfile
@@ -207,11 +208,18 @@ def test_opening_the_page_makes_no_model_call(admin, db, student, counter):
     assert counter.calls == 0
 
 
-def test_generate_makes_exactly_one_model_call(admin, db, student, counter):
-    response = _generate(admin, student)
+def test_generate_makes_exactly_one_model_call(
+        admin, db, student, counter, caplog):
+    with caplog.at_level(logging.INFO, logger="matbot"):
+        response = _generate(admin, student)
     assert response.status_code == 302
     assert counter.calls == 1
     assert rows(db, "SELECT COUNT(*) FROM monthly_reports")[0][0] == 1
+    messages = [record.getMessage() for record in caplog.records]
+    assert any(
+        message.startswith("reports_timing operation=generate status=ready ")
+        for message in messages)
+    assert not any("student_id=" in message for message in messages)
 
 
 def test_saving_edits_makes_no_model_call(admin, db, student, counter):
@@ -600,7 +608,7 @@ def test_bulk_does_not_retry_an_unknown_model_outcome(
 
 
 def test_same_student_cannot_generate_twice_concurrently(
-        db, student, monkeypatch):
+        db, student, monkeypatch, caplog):
     from matbot.llm import LLMResult
 
     _add_report_activity(student, "same-student-inflight")
@@ -623,8 +631,9 @@ def test_same_student_cannot_generate_twice_concurrently(
     worker.start()
     assert entered.wait(2.0)
 
-    duplicate = admin_reports._generate_one_report(
-        student, "2026-08", replace=True)
+    with caplog.at_level(logging.INFO, logger="matbot.admin_reports"):
+        duplicate = admin_reports._generate_one_report(
+            student, "2026-08", replace=True)
     release.set()
     worker.join(2.0)
 
@@ -632,6 +641,11 @@ def test_same_student_cannot_generate_twice_concurrently(
     assert first and first[0][1] == "ready"
     assert len(calls) == 1
     assert rows(db, "SELECT COUNT(*) FROM monthly_reports")[0][0] == 1
+    messages = [record.getMessage() for record in caplog.records
+                if "code=already_in_progress" in record.getMessage()]
+    assert messages == [
+        "admin_report_generate_blocked code=already_in_progress"]
+    assert str(student) not in messages[0]
 
 
 def test_all_declared_narrative_sections_are_saved_and_reports_are_isolated(
@@ -852,8 +866,8 @@ def test_pdf_filename_carries_no_identifier(admin, db, student):
 # ---------------------------------------------------------------------------
 # Izolacija kvara
 # ---------------------------------------------------------------------------
-def test_model_failure_shows_a_safe_message_and_writes_nothing(admin, db, student,
-                                                               monkeypatch):
+def test_model_failure_shows_a_safe_message_and_writes_nothing(
+        admin, db, student, monkeypatch, caplog):
     from matbot.llm import LLMTimeout
 
     class Failing:
@@ -861,7 +875,8 @@ def test_model_failure_shows_a_safe_message_and_writes_nothing(admin, db, studen
             raise LLMTimeout("timeout")
 
     monkeypatch.setattr("matbot.llm.OpenAIPracticeLLM", lambda *a, **k: Failing())
-    response = _generate(admin, student)
+    with caplog.at_level(logging.INFO, logger="matbot"):
+        response = _generate(admin, student)
     html = response.get_data(as_text=True)
 
     assert response.status_code == 200
@@ -871,6 +886,13 @@ def test_model_failure_shows_a_safe_message_and_writes_nothing(admin, db, studen
                  "report_ai_rejected"):
         assert leak not in html, leak
     assert rows(db, "SELECT COUNT(*) FROM monthly_reports")[0][0] == 0
+    messages = [record.getMessage() for record in caplog.records]
+    assert "report_ai_failed stage=call code=LLMTimeout" in messages
+    assert any(
+        message.startswith(
+            "admin_report_generate_failed code=report_ai_call_failed:")
+        for message in messages)
+    assert not any("student_id=" in message for message in messages)
 
 
 def test_model_failure_leaves_an_existing_draft_untouched(admin, db, student,
@@ -896,8 +918,8 @@ def test_model_failure_leaves_an_existing_draft_untouched(admin, db, student,
     assert saved["instructor_comment"] == "I komentar."
 
 
-def test_rejected_model_output_never_reaches_the_page(admin, db, student,
-                                                      monkeypatch):
+def test_rejected_model_output_never_reaches_the_page(
+        admin, db, student, monkeypatch, caplog):
     class Inventing:
         def report_turn(self, instructions, input_text):
             from matbot.llm import LLMResult
@@ -906,11 +928,17 @@ def test_rejected_model_output_never_reaches_the_page(admin, db, student,
                 summary="Tačnost je iznosila 91 posto ovog mjeseca."))
 
     monkeypatch.setattr("matbot.llm.OpenAIPracticeLLM", lambda *a, **k: Inventing())
-    html = _generate(admin, student).get_data(as_text=True)
+    with caplog.at_level(logging.INFO, logger="matbot"):
+        html = _generate(admin, student).get_data(as_text=True)
 
     assert parent_report.SAFE_AI_ERROR in html
     assert "91 posto" not in html
     assert rows(db, "SELECT COUNT(*) FROM monthly_reports")[0][0] == 0
+    messages = [record.getMessage() for record in caplog.records]
+    assert any(message.startswith("report_ai_rejected problems=")
+               for message in messages)
+    assert not any("91 posto" in message for message in messages)
+    assert not any("student_id=" in message for message in messages)
 
 
 def test_report_failure_does_not_affect_the_tutor(admin, client, db, student,

@@ -608,6 +608,7 @@ def test_importing_the_flask_app_offline_still_works():
     result = _import_offline("import app; print('ok')")
     assert result.returncode == 0, result.stderr
     assert "ok" in result.stdout
+    assert "matbot_effective_configuration" in result.stderr
 
 
 def test_the_flask_app_refuses_to_start_on_a_wrong_production_configuration():
