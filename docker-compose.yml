@@ -43,6 +43,9 @@ services:
       MATBOT_PRACTICE_SINGLE_HINT: ${MATBOT_PRACTICE_SINGLE_HINT:-}
       MATBOT_ARCHETYPE_ROTATION: ${MATBOT_ARCHETYPE_ROTATION:-}
       MATBOT_FORM_ROTATION: ${MATBOT_FORM_ROTATION:-}
+      # Procesno stanje (sesije, lockovi i Reports concurrency) zahtijeva
+      # tacno jedan Gunicorn worker; release guard odbija svaku drugu vrijednost.
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-}
       # Prekidač zatvorenog pada. Prazno (lokalni run) = start samo upozorava;
       # `enabled` (produkcija, upisuje deploy) = start ODBIJA pogrešnu
       # konfiguraciju. Vidi app.py i matbot/release_config.py.

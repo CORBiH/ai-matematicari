@@ -3,10 +3,11 @@
 DVIJE TVRDNJE:
   1. SIGURNOST — generisanje, snimanje i PDF su iza administratorske prijave i
      CSRF-a; tutorski token ovdje ne znači ništa.
-  2. TROŠAK JE OGRANIČEN — model se zove TAČNO jednom po običnom pokušaju i
-     samo na izričito „Generiši". Jedini izuzetak je jedan dokazano privremeni
-     bulk retry. Otvaranje stranice, snimanje izmjena i preuzimanje PDF-a ne
-     zovu model NIKAD. To se mjeri brojačem, ne pretpostavlja.
+  2. TROŠAK JE OGRANIČEN — model se zove NAJVIŠE jednom po pokušaju i samo
+     na izričito „Generiši". Nema automatskog retryja ni poslije timeouta,
+     provider greške ili nepoznatog ishoda. Otvaranje stranice, snimanje
+     izmjena i preuzimanje PDF-a ne zovu model NIKAD. To se mjeri brojačem,
+     ne pretpostavlja.
 
 Druga tvrdnja je razlog zašto ovaj fajl postoji odvojeno: administrator koji
 uređuje tekst klikće često, a svaki klik koji bi tiho platio poziv bio bi kvar
@@ -416,51 +417,177 @@ def test_bulk_generation_runs_two_independent_model_waits_concurrently(
     assert len(calls) == 2
 
 
-def test_bulk_retries_one_transient_model_failure_and_saves_once(
-        admin, db, student, monkeypatch):
-    from matbot import config
-    from matbot.llm import LLMResult, LLMTimeout
+def test_process_wide_limit_covers_simultaneous_bulk_and_individual_requests(
+        flask_app, admin_env, db, student, monkeypatch):
+    """Dva HTTP bulk zahtjeva i individualni put dijele ISTA dva mjesta.
 
-    _add_report_activity(student, "bulk-transient")
+    Drugi zahtjevi završavaju dok su prva dva modela još blokirana. Time test
+    ujedno dokazuje da se ne čeka u neograničenom redu i da modelski poziv ne
+    drži zajednički DB lock.
+    """
+    database = reporting_db.get_database()
+    others = [
+        database.create_student("Učenik %d" % index, 7,
+                                "global-limit-%d@example.com" % index)
+        for index in range(2, 6)
+    ]
+    student_ids = [student] + others
+    for index, student_id in enumerate(student_ids):
+        _add_report_activity(student_id, "global-limit-%d" % index)
+
+    state = {"active": 0, "maximum": 0, "calls": 0}
+    state_lock = threading.Lock()
+    two_active = threading.Event()
+    release = threading.Event()
+
+    class BlockingLLM:
+        def report_turn(self, instructions, input_text):
+            with state_lock:
+                state["active"] += 1
+                state["calls"] += 1
+                state["maximum"] = max(state["maximum"], state["active"])
+                if state["active"] == 2:
+                    two_active.set()
+            try:
+                assert release.wait(5.0)
+                from matbot.llm import LLMResult
+                return LLMResult(output=good_narrative())
+            finally:
+                with state_lock:
+                    state["active"] -= 1
+
+    monkeypatch.setattr("matbot.llm.OpenAIPracticeLLM", BlockingLLM)
+
+    def logged_in_client():
+        client = flask_app.test_client()
+        token = _csrf_from(client.get("/admin/reports/login"))
+        response = client.post(
+            "/admin/reports/login",
+            data={"csrf_token": token, "password": PASSWORD})
+        assert response.status_code == 302
+        return client
+
+    first_client = logged_in_client()
+    second_client = logged_in_client()
+    individual_client = logged_in_client()
+    first_token = _csrf_from(first_client.get(
+        "/admin/reports/students?month=2026-08"))
+    second_token = _csrf_from(second_client.get(
+        "/admin/reports/students?month=2026-08"))
+    individual_token = _page_csrf(
+        individual_client, student_ids[4])
+
+    first_responses = []
+    first_thread = threading.Thread(target=lambda: first_responses.append(
+        first_client.post("/admin/reports/bulk/generate", data=MultiDict([
+            ("csrf_token", first_token), ("month", "2026-08"),
+            ("student_ids", str(student_ids[0])),
+            ("student_ids", str(student_ids[1])),
+        ]))))
+    first_thread.start()
+    try:
+        assert two_active.wait(5.0)
+
+        second = second_client.post(
+            "/admin/reports/bulk/generate", data=MultiDict([
+                ("csrf_token", second_token), ("month", "2026-08"),
+                ("student_ids", str(student_ids[2])),
+                ("student_ids", str(student_ids[3])),
+            ]))
+        individual = individual_client.post(
+            "/admin/reports/student/%d/generate?month=2026-08"
+            % student_ids[4], data={"csrf_token": individual_token})
+
+        assert second.status_code == 200
+        assert [item["status"] for item in second.get_json()["results"]] == [
+            "error", "error"]
+        assert {item["message"] for item in second.get_json()["results"]} == {
+            admin_reports.ERROR_GENERATION_BUSY}
+        assert individual.status_code == 200
+        assert admin_reports.ERROR_GENERATION_BUSY in individual.get_data(
+            as_text=True)
+        assert state["maximum"] == 2
+        assert state["calls"] == 2
+    finally:
+        release.set()
+        first_thread.join(5.0)
+
+    assert not first_thread.is_alive()
+    assert first_responses[0].status_code == 200
+    assert [item["status"]
+            for item in first_responses[0].get_json()["results"]] == [
+                "ready", "ready"]
+    assert state == {"active": 0, "maximum": 2, "calls": 2}
+
+
+def test_bulk_timeout_is_not_retried_or_saved(
+        admin, db, student, monkeypatch):
+    from matbot.llm import LLMTimeout
+
+    _add_report_activity(student, "bulk-timeout")
     calls = []
 
-    class TransientThenReady:
+    class TimeoutThenWouldBeReady:
         def report_turn(self, instructions, input_text):
             calls.append(1)
-            if len(calls) == 1:
-                raise LLMTimeout(
-                    "timeout",
-                    diagnostics={"exception_class": "APITimeoutError"})
-            return LLMResult(output=good_narrative())
+            raise LLMTimeout(
+                "timeout",
+                diagnostics={"exception_class": "APITimeoutError"})
 
-    monkeypatch.setattr("matbot.llm.OpenAIPracticeLLM", TransientThenReady)
-    monkeypatch.setattr(config, "REPORTING_BULK_RETRY_BASE_S", 0.0)
+    monkeypatch.setattr(
+        "matbot.llm.OpenAIPracticeLLM", TimeoutThenWouldBeReady)
     token = _csrf_from(admin.get("/admin/reports/students?month=2026-08"))
     response = admin.post("/admin/reports/bulk/generate", data={
         "csrf_token": token, "month": "2026-08",
         "student_ids": str(student),
     })
 
-    assert response.get_json()["results"][0]["status"] == "ready"
-    assert len(calls) == 2
-    assert rows(db, "SELECT COUNT(*) FROM monthly_reports")[0][0] == 1
+    assert response.get_json()["results"][0]["status"] == "error"
+    assert len(calls) == 1
+    assert rows(db, "SELECT COUNT(*) FROM monthly_reports")[0][0] == 0
 
 
-def test_bulk_does_not_retry_permanent_model_failure(
-        admin, db, student, monkeypatch):
+@pytest.mark.parametrize("exception_class", [
+    "APIConnectionError", "RateLimitError", "InternalServerError",
+    "AuthenticationError",
+])
+def test_bulk_does_not_retry_provider_or_connection_failure(
+        admin, db, student, monkeypatch, exception_class):
     from matbot.llm import LLMUnavailable
 
     _add_report_activity(student, "bulk-permanent")
     calls = []
 
-    class PermanentFailure:
+    class ProviderFailure:
         def report_turn(self, instructions, input_text):
             calls.append(1)
             raise LLMUnavailable(
-                "auth",
-                diagnostics={"exception_class": "AuthenticationError"})
+                "provider",
+                diagnostics={"exception_class": exception_class})
 
-    monkeypatch.setattr("matbot.llm.OpenAIPracticeLLM", PermanentFailure)
+    monkeypatch.setattr("matbot.llm.OpenAIPracticeLLM", ProviderFailure)
+    token = _csrf_from(admin.get("/admin/reports/students?month=2026-08"))
+    response = admin.post("/admin/reports/bulk/generate", data={
+        "csrf_token": token, "month": "2026-08",
+        "student_ids": str(student),
+    })
+
+    assert response.get_json()["results"][0]["status"] == "error"
+    assert len(calls) == 1
+    assert rows(db, "SELECT COUNT(*) FROM monthly_reports")[0][0] == 0
+
+
+def test_bulk_does_not_retry_an_unknown_model_outcome(
+        admin, db, student, monkeypatch):
+    _add_report_activity(student, "bulk-unknown")
+    calls = []
+
+    class UnknownFailure:
+        def report_turn(self, instructions, input_text):
+            calls.append(1)
+            raise RuntimeError("unknown outcome")
+
+    monkeypatch.setattr("matbot.llm.OpenAIPracticeLLM", UnknownFailure)
     token = _csrf_from(admin.get("/admin/reports/students?month=2026-08"))
     response = admin.post("/admin/reports/bulk/generate", data={
         "csrf_token": token, "month": "2026-08",
@@ -491,13 +618,13 @@ def test_same_student_cannot_generate_twice_concurrently(
     monkeypatch.setattr("matbot.llm.OpenAIPracticeLLM", BlockingLLM)
     first = []
     worker = threading.Thread(target=lambda: first.append(
-        admin_reports._generate_one_report_with_retries(
-            student, "2026-08", replace=True, transient_retries=0)))
+        admin_reports._generate_one_report(
+            student, "2026-08", replace=True)))
     worker.start()
     assert entered.wait(2.0)
 
-    duplicate = admin_reports._generate_one_report_with_retries(
-        student, "2026-08", replace=True, transient_retries=0)
+    duplicate = admin_reports._generate_one_report(
+        student, "2026-08", replace=True)
     release.set()
     worker.join(2.0)
 

@@ -18,10 +18,10 @@ MODEL JE UNUTAR TOKA, NE NA NJEGOVOM VRHU. Sve brojke postoje prije poziva i ne
 mijenjaju se poslije njega; model dodaje samo prozu. Zato pad modela ne obara
 izvještaj — administrator i dalje vidi sve činjenice, samo bez teksta (Dio 13).
 
-TAČNO JEDAN PLAĆENI POZIV PO POKUŠAJU. Nema Reviewera ni popravke. Pojedinačno
-generisanje nema retry; bounded bulk orkestrator smije jednom ponoviti samo
-dokazano privremeni transportni/rate-limit/server kvar. Otvaranje stranice,
-snimanje izmjena i pravljenje PDF-a ne zovu model NIKAD (Dio 32) — to nije
+TAČNO JEDAN PLAĆENI POZIV PO POKUŠAJU. Nema Reviewera, popravke ni automatskog
+retryja, uključujući timeout, transportni/provider kvar i nepoznat ishod.
+Otvaranje stranice, snimanje izmjena i pravljenje PDF-a ne zovu model NIKAD
+(Dio 32) — to nije
 optimizacija nego ugovor: administrator koji uređuje tekst ne smije slučajno
 trošiti novac po kliku.
 """
@@ -64,10 +64,9 @@ MAX_EDITABLE_PARENT_COMMENT_CHARS = 220
 class ReportGenerationError(RuntimeError):
     """AI nacrt nije napravljen. `code` je INTERNI kod za log, ne za ekran."""
 
-    def __init__(self, code, *, transient=False):
+    def __init__(self, code):
         super().__init__(code)
         self.code = code
-        self.transient = bool(transient)
 
 
 class ReportEligibilityError(RuntimeError):
@@ -138,18 +137,8 @@ def generate_narrative(facts, llm):
         # Dijagnostika ide u log; poruka za ekran je uvijek ista i bezopasna.
         logger.info("report_ai_failed stage=call code=%s",
                     type(error).__name__)
-        transient_classes = {
-            "APITimeoutError", "APIConnectionError", "RateLimitError",
-            "InternalServerError", "ServiceUnavailableError",
-        }
-        exception_class = (getattr(error, "diagnostics", None) or {}).get(
-            "exception_class")
-        transient = (isinstance(error, llm_module.LLMTimeout)
-                     or (isinstance(error, llm_module.LLMUnavailable)
-                         and exception_class in transient_classes))
         raise ReportGenerationError(
-            "report_ai_call_failed:" + type(error).__name__,
-            transient=transient) from None
+            "report_ai_call_failed:" + type(error).__name__) from None
 
     # `LLMResult.output` je već validiran pydantic model (`ReportNarrativeOutput`);
     # `_structured_turn` bi ranije bacio da nije. Test dvojnici smiju vratiti

@@ -1,7 +1,8 @@
 # MAT-BOT Reports performance audit
 
-Status: implementation and isolated before/after measurements complete; production
-runtime validation pending access.
+Status: implementation and deployment-blocker fixes complete locally; the
+separately authorized paid release gate and production runtime validation remain
+pending.
 
 Date: 2026-10-09 (Europe/Sarajevo)
 
@@ -198,17 +199,24 @@ be applied to production during this audit.
   payload sizes, call counts, row counts, and concurrency;
 - adds locally proven composite indexes through an idempotent SQL script, with
   production application deferred to deployment review;
-- introduces conservative, configurable bounded server-side bulk concurrency around
-  independent report generations, with per-student isolation and bounded transient
-  retry, then remove the browser's one-request-per-student serialization;
+- introduces a shared process-wide executor and a hard, non-blocking maximum of two
+  active report-model calls across individual and bulk generation, while preserving
+  per-student isolation and removing the browser's one-request-per-student
+  serialization;
+- removes every automatic report retry: timeout, connection/provider failure,
+  validation failure, and unknown outcome all stop after the first model call;
+- requires `WEB_CONCURRENCY=1` through the existing release declaration, deploy
+  environment application, Compose forwarding, startup diagnostics, and fail-closed
+  release verifier;
 - preserves all current authorization, eligibility, grade, report validation,
   persistence, and UI semantics.
 
 The individual monthly input was also reduced from eleven warm SQL executions to
 five by fetching both Thinkific periods/sections in one query and all MAT-BOT
-monthly aggregates in one query. Bulk requests are sent in two-student batches and
-run with concurrency two by default. A transient failure may be retried once only
-when a complete retry still fits the 50-second bulk AI deadline. A process-local
+monthly aggregates in one query. Bulk requests are sent in two-student batches to
+one shared two-worker executor. A separate shared semaphore covers the actual model
+call on both individual and bulk paths; admission is non-blocking, so overload gets
+a safe user-visible busy result instead of an unbounded queue. A process-local
 in-flight guard prevents duplicate concurrent generation for the same
 student/month. No new service or dependency was introduced.
 
@@ -250,6 +258,43 @@ Roster response size was essentially unchanged (170,556 -> 170,758 bytes). The
 optimization removes backend work and round trips, not rows or interface content.
 Browser parse/render time and response serialization as a separate stage remain
 NOT MEASURED; route wall time includes Jinja rendering and response construction.
+
+### Deployment-blocker fix rebenchmark
+
+After removing retries and replacing per-request executors with shared process-wide
+admission, `scripts/benchmark_reports_local.py` reran an equivalent synthetic shape:
+120 active students across four grades, current/prior snapshots with six sections,
+four sessions, MAT-BOT activity, one assessment, and reports for half the roster.
+The seed text is not byte-identical to the original audit dataset, so query counts
+and same-run concurrency comparison are stronger evidence than small wall-time
+differences.
+
+| Operation | Previous optimized p50 | Blocker-fix p50 / p95 | SQL p50 |
+|---|---:|---:|---:|
+| Reports dashboard, warm | 8.02 ms | 8.03 / 8.85 ms | 6 |
+| Monthly roster, 120 rows | 56.76 ms | 34.41 / 37.08 ms | 6 |
+| Search returning one student | 17.46 ms | 18.07 / 19.80 ms | 6 |
+| Grade filter returning 30 students | 19.38 ms | 13.61 / 14.84 ms | 6 |
+| Existing report retrieval | 0.16 ms | 0.19 / 0.31 ms | 1 |
+| Monthly input aggregation | 3.64 ms | 2.18 / 3.11 ms | 5 |
+| Individual deterministic preparation | 3.67 ms | 2.44 / 3.20 ms | 5 |
+| Individual generation, 50 ms fake API | 57.77 ms | 58.14 / 68.48 ms | 9 |
+| Bulk generation, ten students, 50 ms fake API each | 298.83 ms | 364.71 / 444.72 ms | 105 |
+
+The new bulk p50 is 22.0% slower than the earlier optimized p50; this variation
+includes a recreated seed and higher measured local DB time. The safety-correct
+comparison inside the current run is 648.46 ms sequential (15.42 students/s)
+versus 364.71 ms through bounded two-way bulk concurrency (27.42 students/s):
+43.8% less wall time and 77.8% more throughput. It also remains 40.5% faster than
+the original 613.35 ms sequential baseline. The fake model was
+called exactly 108 times for 108 requested generation attempts across the measured
+individual, sequential, and bulk runs; there were no automatic extra calls.
+
+The query-performance contracts remain unchanged: readiness is one query after
+connection warmup, roster metrics are one set-based query, the rendered roster is
+six SQL executions independent of row count, a warm full input is five, and an
+existing report read is one. The optional index script was not applied by this
+benchmark.
 
 ## Root-cause verdict
 
@@ -331,33 +376,45 @@ speed would violate the quality requirement.
   paired Thinkific retrieval, combined MAT-BOT aggregation, connection-scoped
   successful schema-capability cache.
 - `matbot/report_input.py`: uses the paired current/prior Thinkific read.
-- `matbot/admin_reports.py`: lazy roster data, safe stage timing, bounded bulk
-  executor, retry deadline/backoff, duplicate in-flight guard, sanitized errors.
-- `matbot/parent_report.py`: transient classification and PII-free AI timing.
-- `matbot/config.py` and `.env.example`: bounded bulk concurrency/batch/retry/deadline
-  settings; defaults require no production env change.
+- `matbot/admin_reports.py`: lazy roster data, safe stage timing, one shared
+  two-worker executor, non-blocking bulk/model admission, duplicate in-flight
+  guard, one-call enforcement, and sanitized overload/errors.
+- `matbot/parent_report.py`: one-call/no-retry error contract and PII-free AI timing.
+- `matbot/config.py` and `.env.example`: hard process-wide model-call limit and
+  two-student request size; obsolete retry/concurrency/deadline settings removed.
+- `matbot/release_config.py`, `deploy/production_release.env`, and
+  `docker-compose.yml`: declare, forward, display, and fail closed unless
+  `WEB_CONCURRENCY=1`.
 - `templates/admin_students.html`: batches two selected students per request while
-  preserving status, retry, selection, edit, and download behavior.
+  preserving status, user-triggered retry selection, edit, and download behavior.
 - `scripts/migrations/reporting_performance_indexes.sql`: optional additive,
   idempotent indexes; not applied to production.
+- `scripts/benchmark_reports_local.py`: reproducible local-only synthetic
+  benchmark with a fake 50 ms model; no Turso/OpenAI network access and no optional
+  index application.
 - `tests/test_reports_performance.py`, `tests/test_admin_reports.py`, and
   `tests/test_admin_parent_report.py`: query ceilings, EXPLAIN proof, lazy roster,
-  concurrency, retry/permanent failure, isolation, and duplicate prevention.
+  simultaneous bulk/individual global concurrency, no-retry failures, isolation,
+  and duplicate prevention.
+- `tests/test_release_configuration_parity.py`: accepted one-worker and rejected
+  multi-worker release/startup configuration.
 - this audit document.
 
 ## Tests and untested scenarios
 
-- Final Reports-focused regression run: 130 passed in 41.77 s, including the
-  duplicate in-flight guard, bulk concurrency/retry behavior, query ceilings,
-  and report-input model coverage.
-- Full suite: 11,100 passed, 29 failed, 4 skipped in 451.58 s. None of the failures
-  implicated Reports code. Twenty-eight were Windows environment/shell/sandbox
-  failures (`sh` absent or Windows paths passed to WSL bash; Node initially denied
-  parent-directory `lstat`). The remaining existing libSQL four-thread identity
-  race passed immediately when rerun outside the loaded full suite.
-- Escalated rerun: frontend DOM and the identity concurrency test passed; 27
-  pre-push/deploy shell tests remained unexecutable because a compatible POSIX
-  `sh` with Windows path translation is unavailable.
+- Blocker-fix Reports/Thinkific/reporting regression: 715 passed in 126.73 s;
+  adjacent admin/auth/grade/session regression: 348 passed in 67.52 s.
+- Core tutoring isolation regression (Practice, Explain, Quick, Kontrolni, API,
+  LLM failure policy): 413 passed in 7.47 s.
+- Release/POSIX/frontend batch under Git Bash: 313 passed, 1 expected skip; the
+  single sandboxed Node `EPERM` result passed immediately when rerun with filesystem
+  access (1 passed in 3.96 s). The final changed-path batch passed 130 tests,
+  including 84 release-configuration cases.
+- Complete suite under the compatible Git Bash/unsandboxed filesystem setup:
+  11,136 passed, 4 skipped, 0 failed in 437.15 s.
+- The installed WSL Ubuntu image has Python and Bash but not pytest or Docker;
+  Docker is also unavailable on the Windows host. Git Bash syntax checks pass for
+  the deploy environment script and pre-push hook.
 - Production Turso, VPS, Docker, Nginx, Gunicorn queueing, real OpenAI, browser
   navigation/render, CPU, and memory remain untested.
 
@@ -377,9 +434,10 @@ optional and must be handled separately:
 The three indexes add storage and write amplification. They can be rolled back by
 dropping only those named indexes; application correctness does not depend on them.
 App rollback is a normal Git revert/redeploy. Successful schema caching is scoped
-to one connection and disappears on reconnect/restart. Bulk behavior can be rolled
-back without code by setting concurrency and request size to one and retries to
-zero, though the frontend batch size is rendered from the same server setting.
+to one connection and disappears on reconnect/restart. Setting the request size to
+one serializes browser bulk batches, but the hard process-wide maximum remains two;
+there is intentionally no retry control because automatic report retries are
+prohibited.
 
 ## Cost/benefit and final recommendation
 
@@ -392,9 +450,8 @@ zero, though the frontend batch size is rendered from the same server setting.
   benchmark.
 - The implemented changes add no service and no fixed monthly cost. Indexes consume
   some database storage/write work. Concurrency changes burst shape, not normal call
-  count. A transient bulk failure can add at most one attempt and only within the
-  deadline, so rare retry cost may rise; permanent/validation/auth failures do not
-  retry.
+  count. Every failed, timed-out, provider-error, validation-error, and unknown
+  attempt stops after at most one report-model call.
 - Current hosting prices and plan limits are unknown because the live plans and
   account tiers were not available; no price was invented.
 
@@ -402,7 +459,9 @@ zero, though the frontend batch size is rendered from the same server setting.
 especially roster overfetch, repeated schema introspection, and sequential bulk
 generation. Turso's network nature amplified it, but Turso service quality is not
 proven to be a problem. Hetzner CPU/RAM and Nginx are unmeasured, and OpenAI is an
-unmeasured external critical path only during generation. Deploy the code first,
-collect the new timings and host/database metrics, then consider infrastructure.
-There is currently no evidence-based reason to spend more on VPS, Turso, a new
-database, Redis/Celery, or a different model.
+unmeasured external critical path only during generation. The code is ready for the
+separately authorized paid release gate; production remains blocked until that gate
+passes for the final commit. After deployment, collect the new timings and
+host/database metrics before considering infrastructure. There is currently no
+evidence-based reason to spend more on VPS, Turso, a new database, Redis/Celery, or
+a different model.

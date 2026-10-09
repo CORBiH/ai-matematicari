@@ -172,25 +172,14 @@ MAX_OUTPUT_TOKENS_REPORTING = _int_env("MATBOT_MAX_OUTPUT_TOKENS_REPORTING", 200
 # Rok je vlastiti i kraći od tutorskog: administrator čeka pred ekranom, a
 # izvještaj koji kasni nije hitan kao odgovor djetetu usred zadatka.
 REPORTING_TIMEOUT_S = _float_env("MATBOT_REPORTING_TIMEOUT", 40.0)
-# Bulk Reports ostaje sinhron i zato namjerno koristi vrlo malu paralelnost.
-# Dva nezavisna model poziva skrivaju veci dio mreznog cekanja, a ne mogu
-# zauzeti svih osam Gunicorn niti niti napraviti nekontrolisan skok potrosnje.
-# Granice su tvrde i kad je env pogresno postavljen.
-REPORTING_BULK_CONCURRENCY = min(
-    4, max(1, _int_env("MATBOT_REPORTING_BULK_CONCURRENCY", 2)))
+# Reports ostaje sinhron i zato ima TVRDU procesnu granicu, ne podesivu env
+# vrijednost koja bi mogla tiho zaobici auditirani ugovor. I pojedinacni i bulk
+# put koriste ista dva mjesta za modelski poziv. Bulk zahtjev nosi najvise dva
+# ucenika, pa zajednicki executor nema neogranicen red cekanja.
+REPORTING_MAX_ACTIVE_MODEL_CALLS = 2
 REPORTING_BULK_REQUEST_SIZE = min(
-    8, max(REPORTING_BULK_CONCURRENCY,
-           _int_env("MATBOT_REPORTING_BULK_REQUEST_SIZE", 2)))
-REPORTING_BULK_TRANSIENT_RETRIES = min(
-    2, max(0, _int_env("MATBOT_REPORTING_BULK_TRANSIENT_RETRIES", 1)))
-REPORTING_BULK_RETRY_BASE_S = min(
-    2.0, max(0.0, _float_env("MATBOT_REPORTING_BULK_RETRY_BASE_S", 0.25)))
-# Ukupan AI prozor jednog bulk zahtjeva. Retry se pokrece samo ako u ovom
-# prozoru ostaje cijeli rok narednog poziva; timeout od 40 s zato se ne pretvara
-# u 80 s i ne probija vjerovatni proxy rok od 60 s.
-REPORTING_BULK_DEADLINE_S = min(
-    90.0, max(REPORTING_TIMEOUT_S,
-              _float_env("MATBOT_REPORTING_BULK_DEADLINE_S", 50.0)))
+    REPORTING_MAX_ACTIVE_MODEL_CALLS,
+    max(1, _int_env("MATBOT_REPORTING_BULK_REQUEST_SIZE", 2)))
 
 KONTROLNI_MODEL = os.environ.get("MATBOT_KONTROLNI_MODEL", "gpt-5.6-luna")
 KONTROLNI_REASONING_EFFORT = os.environ.get(

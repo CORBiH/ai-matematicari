@@ -90,6 +90,19 @@ LOGIN_LIMITER_KEY = "MATBOT_ADMIN_LOGIN_LIMITER"
 _REPORT_GENERATION_INFLIGHT = set()
 _REPORT_GENERATION_INFLIGHT_LOCK = threading.Lock()
 
+# JEDNA procesna granica za SVE izvjestajne modelske pozive. Uzimanje je
+# neblokirajuce: osam Gunicorn niti nikad ne stoji u neogranicenom redu cekajuci
+# OpenAI. Bulk dodatno koristi jedan zajednicki executor i dva admission mjesta,
+# pa istovremeni HTTP zahtjevi ne mogu svaki napraviti vlastiti pool/red niti
+# zaobici granicu. Oba semafora se oslobadjaju iskljucivo u `finally` blokovima.
+_REPORT_MODEL_SLOTS = threading.BoundedSemaphore(
+    config.REPORTING_MAX_ACTIVE_MODEL_CALLS)
+_REPORT_BULK_ADMISSION = threading.BoundedSemaphore(
+    config.REPORTING_MAX_ACTIVE_MODEL_CALLS)
+_REPORT_BULK_EXECUTOR = ThreadPoolExecutor(
+    max_workers=config.REPORTING_MAX_ACTIVE_MODEL_CALLS,
+    thread_name_prefix="matbot-report-bulk")
+
 _ROSTER_FAILURE_PHASES = frozenset((
     "build_plan", "select_actions", "schema_preflight", "validate_targets",
     "validate_action", "freeze_historical_names", "create_students",
@@ -936,6 +949,9 @@ ERROR_REPORT_DISABLED = "Izvještaji su isključeni za PODRŠKA i TEST naloge."
 ERROR_GENERATION_IN_PROGRESS = (
     "Izvještaj za ovog učenika se već generiše. Sačekajte završetak prije "
     "novog pokušaja.")
+ERROR_GENERATION_BUSY = (
+    "Generisanje izvještaja je trenutno zauzeto. Sačekajte da se aktivna "
+    "generisanja završe pa pokušajte ponovo.")
 
 
 def _grade_confirmed(payload):
@@ -1047,12 +1063,6 @@ def _parent_comments_from_form(student_id, month):
 
 def _generate_one_report(student_id, month, *, replace):
     """Generiši ili sigurno ponovo iskoristi jedan sačuvani izvještaj."""
-    return _generate_one_report_with_retries(
-        student_id, month, replace=replace, transient_retries=0)
-
-
-def _generate_one_report_with_retries(student_id, month, *, replace,
-                                      transient_retries):
     key = (int(student_id), month)
     with _REPORT_GENERATION_INFLIGHT_LOCK:
         if key in _REPORT_GENERATION_INFLIGHT:
@@ -1060,22 +1070,19 @@ def _generate_one_report_with_retries(student_id, month, *, replace,
             return payload, "error", ERROR_GENERATION_IN_PROGRESS
         _REPORT_GENERATION_INFLIGHT.add(key)
     try:
-        return _generate_one_report_unlocked(
-            student_id, month, replace=replace,
-            transient_retries=transient_retries)
+        return _generate_one_report_unlocked(student_id, month, replace=replace)
     finally:
         with _REPORT_GENERATION_INFLIGHT_LOCK:
             _REPORT_GENERATION_INFLIGHT.discard(key)
 
 
-def _generate_one_report_unlocked(student_id, month, *, replace,
-                                  transient_retries):
-    """Pripremi izvještaj uz retry samo za dokazano privremeni AI kvar.
+def _generate_one_report_unlocked(student_id, month, *, replace):
+    """Pripremi izvještaj i napravi najviše jedan modelski poziv.
 
-    Dohvat i determinističke činjenice rade se jednom. Retry nikad ne obuhvata
-    validaciju, bazu ili poslovnu zabranu i zato ne može promijeniti podatke niti
-    zaobići fail-closed izlaz. Pojedinačna ruta prosljeđuje nulu; samo bounded
-    bulk koristi konfigurisan mali broj ponovnih pokušaja.
+    Baza i determinističke činjenice završavaju prije uzimanja modelskog
+    mjesta. Zato se ni globalni DB lock ni modelski permit ne drže dok se čeka
+    drugi resurs. Zauzet proces pada brzo i sigurno, bez reda i bez plaćenog
+    poziva.
     """
     started = time.perf_counter()
     data_started = time.perf_counter()
@@ -1103,34 +1110,28 @@ def _generate_one_report_unlocked(student_id, month, *, replace,
     facts_ms = int((time.perf_counter() - facts_started) * 1000)
     from matbot import llm as llm_module
 
+    if not _REPORT_MODEL_SLOTS.acquire(blocking=False):
+        logger.info("admin_report_generate_overloaded code=model_slots_busy")
+        return payload, "error", ERROR_GENERATION_BUSY
+
     ai_started = time.perf_counter()
-    ai_calls = 0
-    while True:
-        ai_calls += 1
-        try:
-            narrative = parent_report.generate_narrative(
-                facts, llm_module.OpenAIPracticeLLM())
-            break
-        except parent_report.ReportGenerationError as error:
-            delay = (config.REPORTING_BULK_RETRY_BASE_S
-                     * (2 ** (ai_calls - 1)))
-            has_retry_budget = (
-                (time.perf_counter() - ai_started) + delay
-                + config.REPORTING_TIMEOUT_S
-                <= config.REPORTING_BULK_DEADLINE_S)
-            if (error.transient and ai_calls <= transient_retries
-                    and has_retry_budget):
-                logger.info(
-                    "admin_report_generate_retry code=%s attempt=%s "
-                    "backoff_ms=%s",
-                    error.code, ai_calls, int(delay * 1000))
-                time.sleep(delay)
-                continue
-            logger.info(
-                "admin_report_generate_failed code=%s calls=%s total_ms=%s",
-                error.code, ai_calls,
-                int((time.perf_counter() - started) * 1000))
-            return payload, "error", parent_report.SAFE_AI_ERROR
+    ai_calls = 1
+    try:
+        narrative = parent_report.generate_narrative(
+            facts, llm_module.OpenAIPracticeLLM())
+    except parent_report.ReportGenerationError as error:
+        logger.info(
+            "admin_report_generate_failed code=%s calls=1 total_ms=%s",
+            error.code, int((time.perf_counter() - started) * 1000))
+        return payload, "error", parent_report.SAFE_AI_ERROR
+    except Exception as error:
+        logger.error(
+            "admin_report_generate_failed code=unexpected calls=1 "
+            "exception=%s frames=%s",
+            _safe_exception_type(error), _safe_traceback_frames(error))
+        return payload, "error", parent_report.SAFE_AI_ERROR
+    finally:
+        _REPORT_MODEL_SLOTS.release()
     ai_ms = int((time.perf_counter() - ai_started) * 1000)
 
     parent_comments = (payload.get("instruction") or {}).get("parent_comments")
@@ -1223,9 +1224,8 @@ def bulk_generate_reports():
             return {"student_id": student_id, "status": "error",
                     "message": "Učenik nije dostupan za ovaj period."}
         try:
-            _payload, status, message = _generate_one_report_with_retries(
-                student_id, month, replace=replace,
-                transient_retries=config.REPORTING_BULK_TRANSIENT_RETRIES)
+            _payload, status, message = _generate_one_report(
+                student_id, month, replace=replace)
         except reporting_db.ReportingUnavailable as error:
             logger.info("admin_bulk_report_failed code=%s", error.code)
             status, message = "error", parent_report.SAFE_AI_ERROR
@@ -1238,19 +1238,45 @@ def bulk_generate_reports():
         return {"student_id": student_id, "status": status,
                 "message": message}
 
+    def admitted_generate(student_id):
+        try:
+            return generate(student_id)
+        finally:
+            _REPORT_BULK_ADMISSION.release()
+
     started = time.perf_counter()
-    workers = min(config.REPORTING_BULK_CONCURRENCY, len(student_ids))
-    with ThreadPoolExecutor(max_workers=workers,
-                            thread_name_prefix="matbot-report-bulk") as executor:
-        # `map` čuva redoslijed iz forme, dok se sami poslovi izvršavaju
-        # paralelno. Time JSON i administratorski workflow ostaju stabilni.
-        results = list(executor.map(generate, student_ids))
+    ordered = []
+    for student_id in student_ids:
+        if not _REPORT_BULK_ADMISSION.acquire(blocking=False):
+            logger.info("admin_bulk_report_overloaded code=bulk_slots_busy")
+            ordered.append({
+                "student_id": student_id, "status": "error",
+                "message": ERROR_GENERATION_BUSY,
+            })
+            continue
+        try:
+            ordered.append(_REPORT_BULK_EXECUTOR.submit(
+                admitted_generate, student_id))
+        except Exception as error:
+            _REPORT_BULK_ADMISSION.release()
+            logger.error(
+                "admin_bulk_report_submit_failed exception=%s frames=%s",
+                _safe_exception_type(error), _safe_traceback_frames(error))
+            ordered.append({
+                "student_id": student_id, "status": "error",
+                "message": parent_report.SAFE_AI_ERROR,
+            })
+
+    # Future-i su samo dva i vec su globalno primljeni; redoslijed odgovora
+    # ostaje isti kao u formi, bez pravljenja per-request executora.
+    results = [item.result() if hasattr(item, "result") else item
+               for item in ordered]
     completed = sum(1 for item in results
                     if item["status"] in ("ready", "reused"))
     logger.info(
         "reports_timing operation=bulk_generate status=ok students=%s "
-        "completed=%s concurrency=%s total_ms=%s",
-        len(student_ids), completed, workers,
+        "completed=%s concurrency_limit=%s total_ms=%s",
+        len(student_ids), completed, config.REPORTING_MAX_ACTIVE_MODEL_CALLS,
         int((time.perf_counter() - started) * 1000))
     return jsonify({"results": results, "completed": completed,
                     "total": len(results)})

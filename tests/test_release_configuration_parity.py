@@ -69,6 +69,7 @@ def test_required_release_configuration_is_declared_once():
     assert required["AI_TUTOR_TIMEOUT"] == "45"
     assert required["OPENAI_MODEL_TEXT"] == "gpt-5-mini"
     assert required["MATBOT_REASONING_EFFORT"] == "low"
+    assert required["WEB_CONCURRENCY"] == "1"
 
 
 def test_the_audited_route_flags_are_part_of_the_required_configuration():
@@ -281,6 +282,7 @@ def test_an_empty_variable_is_reported(name):
     ("MATBOT_PRACTICE_SINGLE_HINT", "disabled"),
     ("MATBOT_ARCHETYPE_ROTATION", "disabled"),
     ("MATBOT_FORM_ROTATION", "disabled"),
+    ("WEB_CONCURRENCY", "2"),
     ("AI_TUTOR_TIMEOUT", "30"),
     ("AI_TUTOR_TIMEOUT", "abc"),
     ("OPENAI_MODEL_TEXT", "gpt-4o"),
@@ -299,6 +301,16 @@ def test_require_release_configuration_raises_on_a_wrong_value():
         release_config.require_release_configuration(
             _env(MATBOT_FAST_SINGLE_CALL_SCOPE="lessons"))
     assert "MATBOT_FAST_SINGLE_CALL_SCOPE" in str(excinfo.value)
+
+
+def test_release_guard_rejects_multiple_workers_and_accepts_one():
+    assert _problems(_env(WEB_CONCURRENCY="1")) == []
+    problems = _problems(_env(WEB_CONCURRENCY="2"))
+    assert any("WEB_CONCURRENCY" in problem for problem in problems)
+    with pytest.raises(RuntimeError) as excinfo:
+        release_config.require_release_configuration(
+            _env(WEB_CONCURRENCY="2"))
+    assert "WEB_CONCURRENCY" in str(excinfo.value)
 
 
 def test_release_enforcement_is_an_exact_flag():
@@ -328,7 +340,8 @@ def test_effective_configuration_reports_only_non_secret_values():
     assert "super-secret" not in blob and "also-secret" not in blob
     assert "OPENAI_API_KEY" not in report and "FLASK_SECRET_KEY" not in report
     for key in ("difficulty_levels", "model", "reasoning_effort",
-                "timeout_seconds", "reviewer_output_tokens"):
+                "timeout_seconds", "reviewer_output_tokens",
+                "web_concurrency"):
         assert key in report, key
 
 
@@ -339,7 +352,8 @@ def test_startup_diagnostics_prove_every_audited_choice():
     for key in ("difficulty_levels", "fast_single_call_scope",
                 "deterministic_variety_gate", "fast_model", "fast_reasoning_effort",
                 "fast_reviewer_model", "single_hint", "archetype_rotation",
-                "form_rotation", "timeout_seconds", "release_enforcement"):
+                "form_rotation", "timeout_seconds", "web_concurrency",
+                "release_enforcement"):
         assert key in report, key
         assert report[key] != "(unset)", key
     assert report["timeout_seconds"] == release_config.REQUIRED_RELEASE_ENV["AI_TUTOR_TIMEOUT"]
@@ -348,6 +362,7 @@ def test_startup_diagnostics_prove_every_audited_choice():
 def test_effective_configuration_survives_a_missing_variable():
     report = release_config.effective_configuration({})
     assert report["difficulty_levels"] == "(unset)"
+    assert report["web_concurrency"] == "(unset)"
 
 
 def test_the_config_cli_never_prints_a_secret_and_fails_closed():
@@ -607,3 +622,24 @@ def test_the_flask_app_refuses_to_start_on_a_wrong_production_configuration():
                             errors="replace", env=hostile, timeout=180)
     assert result.returncode != 0
     assert "MATBOT_FAST_SINGLE_CALL_SCOPE" in result.stderr
+
+
+def test_the_flask_app_accepts_one_worker_and_refuses_multiple_workers():
+    production = dict(os.environ)
+    production.update(release_config.REQUIRED_RELEASE_ENV)
+    production["FLASK_SECRET_KEY"] = "test-only"
+
+    accepted = subprocess.run(
+        [sys.executable, "-c", "import app; print('ok')"], cwd=str(ROOT),
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        env=production, timeout=180)
+    assert accepted.returncode == 0, accepted.stderr
+    assert "ok" in accepted.stdout
+
+    production["WEB_CONCURRENCY"] = "2"
+    rejected = subprocess.run(
+        [sys.executable, "-c", "import app"], cwd=str(ROOT),
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        env=production, timeout=180)
+    assert rejected.returncode != 0
+    assert "WEB_CONCURRENCY" in rejected.stderr

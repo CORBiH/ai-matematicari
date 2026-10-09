@@ -272,6 +272,7 @@ def effective_configuration(environ=None):
         "reasoning_effort": read("MATBOT_REASONING_EFFORT"),
         "timeout_seconds": read("AI_TUTOR_TIMEOUT"),
         "reviewer_output_tokens": read("MATBOT_MAX_OUTPUT_TOKENS_REVIEWER"),
+        "web_concurrency": read("WEB_CONCURRENCY"),
         "release_enforcement": read(RELEASE_ENFORCEMENT_FLAG),
         "app_commit": read("MATBOT_APP_COMMIT"),
     }

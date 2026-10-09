@@ -15,9 +15,11 @@ Docker, bound to `127.0.0.1:8080`.
 - `app.py` — `ProxyFix(x_for=1, x_proto=1)`: trust exactly one hop, the nginx-added
   `X-Forwarded-For`. Do not add `x_host`/`x_port`/`x_prefix`; nothing needs them and
   trusting them widens the attack surface.
-- Single worker by default, so the in-memory session store, rate-limit counters and
-  turn locks are consistent. **Raising `WEB_CONCURRENCY` above 1 silently breaks
-  all three** — there is no shared store. Do not raise it without adding one.
+- Exactly one worker is mandatory so the in-memory session store, rate-limit
+  counters, turn locks, and Reports concurrency guard are consistent.
+  `deploy/production_release.env` pins `WEB_CONCURRENCY=1`; the deploy verifier and
+  production startup reject any other effective value. The thread default remains
+  eight.
 
 ## Deploy (automatic)
 
@@ -153,7 +155,8 @@ tooling or documentation. Names only:
 | `MATBOT_SESSION_LIMIT_PER_MINUTE` / `_PER_HOUR` | per-session rate limit (15 / 150) |
 | `MATBOT_IP_LIMIT_PER_MINUTE` / `_PER_HOUR` | per-IP rate limit (120 / 1000) |
 | `APP_VERSION` | written by the deploy workflow |
-| `PORT`, `WEB_CONCURRENCY`, `THREADS`, `GUNICORN_TIMEOUT` | container/gunicorn |
+| `PORT`, `THREADS`, `GUNICORN_TIMEOUT` | container/gunicorn |
+| `WEB_CONCURRENCY` | gunicorn worker count; production release contract requires exactly `1` |
 
 Image-size and pixel limits are **hard constants** in `matbot/config.py` with no env
 override, so a mis-set variable cannot raise a security boundary. Keep it that way.
