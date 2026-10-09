@@ -18,13 +18,16 @@ MODEL JE UNUTAR TOKA, NE NA NJEGOVOM VRHU. Sve brojke postoje prije poziva i ne
 mijenjaju se poslije njega; model dodaje samo prozu. Zato pad modela ne obara
 izvještaj — administrator i dalje vidi sve činjenice, samo bez teksta (Dio 13).
 
-TAČNO JEDAN PLAĆENI POZIV PO GENERISANJU. Nema Reviewera, nema popravke, nema
-retryja. Otvaranje stranice, snimanje izmjena i pravljenje PDF-a ne zovu model
-NIKAD (Dio 32) — to nije optimizacija nego ugovor: administrator koji uređuje
-tekst ne smije slučajno trošiti novac po kliku.
+TAČNO JEDAN PLAĆENI POZIV PO POKUŠAJU. Nema Reviewera ni popravke. Pojedinačno
+generisanje nema retry; bounded bulk orkestrator smije jednom ponoviti samo
+dokazano privremeni transportni/rate-limit/server kvar. Otvaranje stranice,
+snimanje izmjena i pravljenje PDF-a ne zovu model NIKAD (Dio 32) — to nije
+optimizacija nego ugovor: administrator koji uređuje tekst ne smije slučajno
+trošiti novac po kliku.
 """
 import json
 import logging
+import time
 
 from matbot import report_facts, report_prompt, report_validation, reporting_db
 from matbot import report_input
@@ -61,9 +64,10 @@ MAX_EDITABLE_PARENT_COMMENT_CHARS = 220
 class ReportGenerationError(RuntimeError):
     """AI nacrt nije napravljen. `code` je INTERNI kod za log, ne za ekran."""
 
-    def __init__(self, code):
+    def __init__(self, code, *, transient=False):
         super().__init__(code)
         self.code = code
+        self.transient = bool(transient)
 
 
 class ReportEligibilityError(RuntimeError):
@@ -126,15 +130,26 @@ def generate_narrative(facts, llm):
     jer bi to bio serverski izmišljen izvještaj o djetetu."""
     from matbot import llm as llm_module
 
+    started = time.perf_counter()
+    input_text = report_prompt.build_input_text(facts)
     try:
-        result = llm.report_turn(report_prompt.SYSTEM_PROMPT,
-                                 report_prompt.build_input_text(facts))
+        result = llm.report_turn(report_prompt.SYSTEM_PROMPT, input_text)
     except llm_module.LLMError as error:
         # Dijagnostika ide u log; poruka za ekran je uvijek ista i bezopasna.
         logger.info("report_ai_failed stage=call code=%s",
                     type(error).__name__)
-        raise ReportGenerationError("report_ai_call_failed:"
-                                    + type(error).__name__) from None
+        transient_classes = {
+            "APITimeoutError", "APIConnectionError", "RateLimitError",
+            "InternalServerError", "ServiceUnavailableError",
+        }
+        exception_class = (getattr(error, "diagnostics", None) or {}).get(
+            "exception_class")
+        transient = (isinstance(error, llm_module.LLMTimeout)
+                     or (isinstance(error, llm_module.LLMUnavailable)
+                         and exception_class in transient_classes))
+        raise ReportGenerationError(
+            "report_ai_call_failed:" + type(error).__name__,
+            transient=transient) from None
 
     # `LLMResult.output` je već validiran pydantic model (`ReportNarrativeOutput`);
     # `_structured_turn` bi ranije bacio da nije. Test dvojnici smiju vratiti
@@ -160,6 +175,13 @@ def generate_narrative(facts, llm):
         # Kodovi su interni (pravilo 7) — nikad ne idu u HTML.
         logger.info("report_ai_rejected problems=%s", ";".join(problems))
         raise ReportGenerationError("report_ai_rejected:" + problems[0])
+    logger.info(
+        "report_ai_timing status=ok total_ms=%s external_ms=%s "
+        "input_chars=%s output_fields=%s calls=1 usage=%s",
+        int((time.perf_counter() - started) * 1000),
+        getattr(result, "latency_ms", None),
+        len(input_text), len(NARRATIVE_FIELDS),
+        getattr(result, "usage", None))
     return narrative
 
 

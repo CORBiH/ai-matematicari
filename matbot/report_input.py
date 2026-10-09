@@ -218,14 +218,13 @@ def build_thinkific_section(student_id, report_month, database=None):
     """Thinkific dio izvještaja: tekući snimak, prošli i razlike."""
     target = database or reporting_db.get_database()
     month = progress.parse_report_month(report_month)
-    current = target.fetch_progress_snapshot(student_id, month)
+    current, prior = target.fetch_progress_pair(
+        student_id, month, previous_month(month))
     if current is None:
         # Učenik postoji u MAT-BOT-u, ali za ovaj mjesec nema izvoza. To je
         # činjenica koju izvještaj mora reći, a ne rupa koju treba popuniti.
         return {"snapshot_missing": True}
 
-    prior = target.fetch_progress_snapshot(
-        student_id, previous_month(month), course_key=current["course_key"])
     prior_sections = {}
     if prior:
         prior_sections = {s["section_name"]: s["progress_percent"]

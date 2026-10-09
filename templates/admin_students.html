@@ -97,7 +97,7 @@
   var boxes=Array.prototype.slice.call(document.querySelectorAll('.row-select:not([disabled])'));
   var count=document.getElementById('selected-count'),bulk=document.getElementById('bulk-form');
   var result=document.getElementById('bulk-result'),retry=document.getElementById('retry-failed');
-  var failed=new Set(),running=false,max={{ max_bulk_generate }};
+  var failed=new Set(),running=false,max={{ max_bulk_generate }},batchSize={{ bulk_request_size }};
   function selected(){return boxes.filter(function(box){return box.checked;});}
   function sync(){var n=selected().length;count.textContent=String(n);bulk.classList.toggle('is-visible',n>0);}
   boxes.forEach(function(box){box.addEventListener('change',sync);});
@@ -111,15 +111,14 @@
     if(targets.length>max){result.hidden=false;result.className='banner err';result.textContent='Najviše '+max+' učenika može se generisati odjednom.';return;}
     if(replace&&!window.confirm('Ponovno generisanje zamjenjuje ručne izmjene u AI sekcijama odabranih izvještaja. Nastaviti?'))return;
     running=true;failed.clear();retry.hidden=true;var ok=0;result.hidden=false;result.className='banner';result.textContent='Generisanje: 0 od '+targets.length+'…';
-    for(var i=0;i<targets.length;i++){
-      var id=targets[i].value;rowState(id,'Generisanje…','Molimo sačekajte.','badge--warning');
-      var body=new URLSearchParams();body.append('csrf_token','{{ csrf_token }}');body.append('month','{{ month }}');body.append('student_ids',id);if(replace)body.append('replace','1');
+    for(var i=0;i<targets.length;i+=batchSize){
+      var batch=targets.slice(i,i+batchSize),body=new URLSearchParams();body.append('csrf_token','{{ csrf_token }}');body.append('month','{{ month }}');if(replace)body.append('replace','1');
+      batch.forEach(function(box){body.append('student_ids',box.value);rowState(box.value,'Generisanje…','Molimo sačekajte.','badge--warning');});
       try{
         var response=await fetch('{{ url_for("admin_reports.bulk_generate_reports") }}',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:body.toString()});if(!response.ok)throw new Error('request');
-        var data=await response.json(),item=data.results[0];
-        if(item.status==='ready'||item.status==='reused'){ok++;revealActions(id);rowState(id,'Spremno',item.status==='reused'?'Postojeći izvještaj je zadržan.':'','badge--success');}else{failed.add(id);rowState(id,'Greška',item.message,'badge--warning');}
-      }catch(error){failed.add(id);rowState(id,'Greška','Zahtjev nije završen. Pokušajte ponovo.','badge--warning');}
-      result.textContent='Generisanje: '+(i+1)+' od '+targets.length+'…';
+        var data=await response.json();(data.results||[]).forEach(function(item){var id=String(item.student_id);if(item.status==='ready'||item.status==='reused'){ok++;revealActions(id);rowState(id,'Spremno',item.status==='reused'?'Postojeći izvještaj je zadržan.':'','badge--success');}else{failed.add(id);rowState(id,'Greška',item.message,'badge--warning');}});
+      }catch(error){batch.forEach(function(box){failed.add(box.value);rowState(box.value,'Greška','Zahtjev nije završen. Pokušajte ponovo.','badge--warning');});}
+      result.textContent='Generisanje: '+Math.min(i+batch.length,targets.length)+' od '+targets.length+'…';
     }
     running=false;retry.hidden=failed.size===0;result.className='banner '+(failed.size?'warn':'ok');result.textContent=ok+' od '+targets.length+' izvještaja uspješno pripremljeno.'+(failed.size?' Neuspjelih: '+failed.size+'.':'');
   }

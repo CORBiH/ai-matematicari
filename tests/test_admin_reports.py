@@ -909,6 +909,22 @@ def test_population_uses_display_name_when_present(admin, db):
     assert "Ana Anić" in html
 
 
+def test_monthly_roster_does_not_build_full_report_per_student(
+        admin, db, monkeypatch):
+    """Lista čita samo sažete metrike; puni ulaz ostaje lazy za profil/AI."""
+    _upload(admin, files={"grade_6": (simple_csv(first="Ana", last="Anić"),
+                                      "a.csv")})
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("roster must not build a full student report")
+
+    monkeypatch.setattr(report_input, "build_report_input", forbidden)
+    response = admin.get("/admin/reports/students?month=2026-09")
+
+    assert response.status_code == 200
+    assert "Ana Anić" in response.get_data(as_text=True)
+
+
 def test_dashboard_and_month_list_show_saved_report_status(
         admin, db, monkeypatch):
     from tests.test_monthly_reports_contract import (

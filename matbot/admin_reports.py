@@ -22,8 +22,11 @@ import io
 import logging
 import os
 import re
+import threading
+import time
 import traceback
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 
 from flask import (Blueprint, Response, abort, jsonify, redirect,
                    render_template, request, url_for)
@@ -79,6 +82,13 @@ STATUS_PARTIAL = "partial"
 STATUS_FAILED = "failed"
 
 LOGIN_LIMITER_KEY = "MATBOT_ADMIN_LOGIN_LIMITER"
+
+# Produkcija namjerno koristi jedan Gunicorn proces (vidi DEPLOYMENT.md), pa je
+# procesni in-flight skup dovoljna granica protiv dva istovremena placena
+# generisanja istog (ucenik, mjesec). Skup nosi samo interne brojeve i prazni se
+# u `finally`; ne cuva profil, izvjestaj ni drugi studentski podatak.
+_REPORT_GENERATION_INFLIGHT = set()
+_REPORT_GENERATION_INFLIGHT_LOCK = threading.Lock()
 
 _ROSTER_FAILURE_PHASES = frozenset((
     "build_plan", "select_actions", "schema_preflight", "validate_targets",
@@ -148,7 +158,7 @@ def schema_state():
     if not config.reporting_db_configured():
         return "unavailable", "Izvještajna baza nije konfigurisana na serveru."
     try:
-        report = reporting_db.get_database().check()
+        report = reporting_db.get_database().check_reports_readiness()
     except Exception:
         logger.info("admin_schema_check_failed")
         return "unavailable", "Izvještajna baza trenutno nije dostupna."
@@ -217,9 +227,10 @@ def logout():
 @admin_reports_bp.route("/", methods=["GET"])
 @require_admin
 def index():
+    started = time.perf_counter()
     state, message = schema_state()
     month = _default_month()
-    return render_template(
+    rendered = render_template(
         "admin_reports.html",
         csrf_token=admin_auth.csrf_token(),
         course_fields=COURSE_FIELDS,
@@ -231,6 +242,12 @@ def index():
         outcome=None,
         errors=[],
     )
+    logger.info(
+        "reports_timing operation=dashboard status=ok total_ms=%s "
+        "payload_bytes=%s",
+        int((time.perf_counter() - started) * 1000),
+        len(rendered.encode("utf-8")))
+    return rendered
 
 
 def _overview(month):
@@ -797,30 +814,34 @@ def _filtered_report_rows(month, filters, database):
     except reporting_db.ReportingUnavailable:
         summaries = None
 
+    start, end = report_input.month_bounds(month)
+    metrics = database.fetch_report_roster_metrics(
+        [row["student_id"] for row in registry], month,
+        report_input.previous_month(month), start, end)
+
     rows = []
     for student in registry:
         student_id = student["student_id"]
-        payload = report_input.build_report_input(student_id, month,
-                                                  database=database)
-        matbot = payload["matbot"]
-        thinkific = payload["thinkific"]
+        summary_metrics = metrics[student_id]
         report_summary = (None if summaries is None
                           else summaries.get(student_id))
         account_type = (student.get("account_type")
                         or reporting_db.ACCOUNT_TYPE_STUDENT)
         rows.append({
             "student_id": student_id,
-            "label": _student_label(payload["profile"], student_id),
-            "grade": payload["profile"].get("grade"),
-            "grades": payload["profile"].get("grades") or [],
-            "grade_confirmed": payload["profile"].get("grade_confirmed", False),
+            "label": _student_label(student, student_id),
+            "grade": student.get("grade"),
+            "grades": student.get("grades") or [],
+            "grade_confirmed": student_grades.is_confirmed_grades(
+                student.get("grades")),
             "account_type": account_type,
             "reporting_enabled": account_type == reporting_db.ACCOUNT_TYPE_STUDENT,
-            "has_snapshot": not thinkific.get("snapshot_missing"),
-            "percent_completed": thinkific.get("percent_completed"),
-            "delta_percent_completed": thinkific.get("delta_percent_completed"),
-            "practice_tasks": matbot["practice_tasks"],
-            "kontrolni_attempts": matbot["kontrolni_attempts"],
+            "has_snapshot": summary_metrics["has_snapshot"],
+            "percent_completed": summary_metrics["percent_completed"],
+            "delta_percent_completed": summary_metrics[
+                "delta_percent_completed"],
+            "practice_tasks": summary_metrics["practice_tasks"],
+            "kontrolni_attempts": summary_metrics["kontrolni_attempts"],
             "has_report": (None if summaries is None
                            else report_summary is not None),
             "generated_at": (report_summary or {}).get("generated_at"),
@@ -832,6 +853,7 @@ def _filtered_report_rows(month, filters, database):
 @admin_reports_bp.route("/students", methods=["GET"])
 @require_admin
 def students():
+    started = time.perf_counter()
     state, message = schema_state()
     raw_month = request.args.get("month", "")
     try:
@@ -854,10 +876,18 @@ def students():
                                schema_state=state, schema_message=message,
                                error="Filter nije ispravan."), 400
     rows = _filtered_report_rows(month, filters, database)
-    return render_template("admin_students.html", month=month, rows=rows,
-                           filters=filters, csrf_token=admin_auth.csrf_token(),
-                           max_bulk_generate=MAX_BULK_GENERATE,
-                           schema_state=state, schema_message=message, error="")
+    rendered = render_template(
+        "admin_students.html", month=month, rows=rows,
+        filters=filters, csrf_token=admin_auth.csrf_token(),
+        max_bulk_generate=MAX_BULK_GENERATE,
+        bulk_request_size=config.REPORTING_BULK_REQUEST_SIZE,
+        schema_state=state, schema_message=message, error="")
+    logger.info(
+        "reports_timing operation=roster status=ok rows=%s total_ms=%s "
+        "payload_bytes=%s",
+        len(rows), int((time.perf_counter() - started) * 1000),
+        len(rendered.encode("utf-8")))
+    return rendered
 
 
 @admin_reports_bp.route("/students.csv", methods=["GET"])
@@ -903,6 +933,9 @@ ERROR_GRADE_UNCONFIRMED = (
     "Trenutni razred učenika nije potvrđen. Potvrdite razred na profilu učenika "
     "prije generisanja novog izvještaja.")
 ERROR_REPORT_DISABLED = "Izvještaji su isključeni za PODRŠKA i TEST naloge."
+ERROR_GENERATION_IN_PROGRESS = (
+    "Izvještaj za ovog učenika se već generiše. Sačekajte završetak prije "
+    "novog pokušaja.")
 
 
 def _grade_confirmed(payload):
@@ -1014,11 +1047,43 @@ def _parent_comments_from_form(student_id, month):
 
 def _generate_one_report(student_id, month, *, replace):
     """Generiši ili sigurno ponovo iskoristi jedan sačuvani izvještaj."""
+    return _generate_one_report_with_retries(
+        student_id, month, replace=replace, transient_retries=0)
+
+
+def _generate_one_report_with_retries(student_id, month, *, replace,
+                                      transient_retries):
+    key = (int(student_id), month)
+    with _REPORT_GENERATION_INFLIGHT_LOCK:
+        if key in _REPORT_GENERATION_INFLIGHT:
+            payload = report_input.build_report_input(student_id, month)
+            return payload, "error", ERROR_GENERATION_IN_PROGRESS
+        _REPORT_GENERATION_INFLIGHT.add(key)
+    try:
+        return _generate_one_report_unlocked(
+            student_id, month, replace=replace,
+            transient_retries=transient_retries)
+    finally:
+        with _REPORT_GENERATION_INFLIGHT_LOCK:
+            _REPORT_GENERATION_INFLIGHT.discard(key)
+
+
+def _generate_one_report_unlocked(student_id, month, *, replace,
+                                  transient_retries):
+    """Pripremi izvještaj uz retry samo za dokazano privremeni AI kvar.
+
+    Dohvat i determinističke činjenice rade se jednom. Retry nikad ne obuhvata
+    validaciju, bazu ili poslovnu zabranu i zato ne može promijeniti podatke niti
+    zaobići fail-closed izlaz. Pojedinačna ruta prosljeđuje nulu; samo bounded
+    bulk koristi konfigurisan mali broj ponovnih pokušaja.
+    """
+    started = time.perf_counter()
+    data_started = time.perf_counter()
     payload = report_input.build_report_input(student_id, month)
+    data_ms = int((time.perf_counter() - data_started) * 1000)
     profile = payload.get("profile") or {}
     if not profile.get("reporting_enabled", True):
-        logger.info("admin_report_generate_blocked code=report_disabled "
-                    "student_id=%s", student_id)
+        logger.info("admin_report_generate_blocked code=report_disabled")
         return payload, "error", ERROR_REPORT_DISABLED
 
     try:
@@ -1030,19 +1095,43 @@ def _generate_one_report(student_id, month, *, replace):
         return payload, "reused", "Postojeći izvještaj je sačuvan."
 
     if not _grade_confirmed(payload):
-        logger.info("admin_report_generate_blocked code=grade_unconfirmed "
-                    "student_id=%s", student_id)
+        logger.info("admin_report_generate_blocked code=grade_unconfirmed")
         return payload, "error", ERROR_GRADE_UNCONFIRMED
 
+    facts_started = time.perf_counter()
     facts = report_facts.build_ai_facts(payload)
+    facts_ms = int((time.perf_counter() - facts_started) * 1000)
     from matbot import llm as llm_module
 
-    try:
-        narrative = parent_report.generate_narrative(
-            facts, llm_module.OpenAIPracticeLLM())
-    except parent_report.ReportGenerationError as error:
-        logger.info("admin_report_generate_failed code=%s", error.code)
-        return payload, "error", parent_report.SAFE_AI_ERROR
+    ai_started = time.perf_counter()
+    ai_calls = 0
+    while True:
+        ai_calls += 1
+        try:
+            narrative = parent_report.generate_narrative(
+                facts, llm_module.OpenAIPracticeLLM())
+            break
+        except parent_report.ReportGenerationError as error:
+            delay = (config.REPORTING_BULK_RETRY_BASE_S
+                     * (2 ** (ai_calls - 1)))
+            has_retry_budget = (
+                (time.perf_counter() - ai_started) + delay
+                + config.REPORTING_TIMEOUT_S
+                <= config.REPORTING_BULK_DEADLINE_S)
+            if (error.transient and ai_calls <= transient_retries
+                    and has_retry_budget):
+                logger.info(
+                    "admin_report_generate_retry code=%s attempt=%s "
+                    "backoff_ms=%s",
+                    error.code, ai_calls, int(delay * 1000))
+                time.sleep(delay)
+                continue
+            logger.info(
+                "admin_report_generate_failed code=%s calls=%s total_ms=%s",
+                error.code, ai_calls,
+                int((time.perf_counter() - started) * 1000))
+            return payload, "error", parent_report.SAFE_AI_ERROR
+    ai_ms = int((time.perf_counter() - ai_started) * 1000)
 
     parent_comments = (payload.get("instruction") or {}).get("parent_comments")
     comments_were_edited = bool(
@@ -1057,12 +1146,20 @@ def _generate_one_report(student_id, month, *, replace):
         student_label=_student_label(payload["profile"], student_id))
     if comments_were_edited:
         snapshot["parent_comments_edited"] = True
+    persistence_started = time.perf_counter()
     try:
         parent_report.save_narrative(student_id, month, narrative, snapshot,
                                      generated_at=parent_report.utc_now())
     except reporting_db.ReportingUnavailable as error:
         logger.info("admin_report_save_failed code=%s", error.code)
         return payload, "error", parent_report.SAFE_AI_ERROR
+    persistence_ms = int((time.perf_counter() - persistence_started) * 1000)
+    logger.info(
+        "reports_timing operation=generate status=ready data_ms=%s "
+        "facts_ms=%s external_wait_ms=%s persistence_ms=%s total_ms=%s "
+        "openai_calls=%s",
+        data_ms, facts_ms, ai_ms, persistence_ms,
+        int((time.perf_counter() - started) * 1000), ai_calls)
     return payload, "ready", "Izvještaj je spreman."
 
 
@@ -1117,29 +1214,44 @@ def bulk_generate_reports():
         month = progress.parse_report_month(request.form.get("month", ""))
     except progress.ProgressFormatError:
         abort(400)
-    student_ids = _selected_student_ids(MAX_BULK_GENERATE)
+    student_ids = _selected_student_ids(config.REPORTING_BULK_REQUEST_SIZE)
     replace = request.form.get("replace") == "1"
     database = reporting_db.get_database()
     allowed = _bulk_allowed_student_ids(month, database)
-    results = []
-    for student_id in student_ids:
+    def generate(student_id):
         if student_id not in allowed:
-            results.append({"student_id": student_id, "status": "error",
-                            "message": "Učenik nije dostupan za ovaj period."})
-            continue
+            return {"student_id": student_id, "status": "error",
+                    "message": "Učenik nije dostupan za ovaj period."}
         try:
-            _payload, status, message = _generate_one_report(
-                student_id, month, replace=replace)
+            _payload, status, message = _generate_one_report_with_retries(
+                student_id, month, replace=replace,
+                transient_retries=config.REPORTING_BULK_TRANSIENT_RETRIES)
         except reporting_db.ReportingUnavailable as error:
             logger.info("admin_bulk_report_failed code=%s", error.code)
             status, message = "error", parent_report.SAFE_AI_ERROR
-        except Exception:
-            logger.exception("admin_bulk_report_failed code=unexpected")
+        except Exception as error:
+            logger.error(
+                "admin_bulk_report_failed code=unexpected exception=%s "
+                "frames=%s",
+                _safe_exception_type(error), _safe_traceback_frames(error))
             status, message = "error", parent_report.SAFE_AI_ERROR
-        results.append({"student_id": student_id, "status": status,
-                        "message": message})
+        return {"student_id": student_id, "status": status,
+                "message": message}
+
+    started = time.perf_counter()
+    workers = min(config.REPORTING_BULK_CONCURRENCY, len(student_ids))
+    with ThreadPoolExecutor(max_workers=workers,
+                            thread_name_prefix="matbot-report-bulk") as executor:
+        # `map` čuva redoslijed iz forme, dok se sami poslovi izvršavaju
+        # paralelno. Time JSON i administratorski workflow ostaju stabilni.
+        results = list(executor.map(generate, student_ids))
     completed = sum(1 for item in results
                     if item["status"] in ("ready", "reused"))
+    logger.info(
+        "reports_timing operation=bulk_generate status=ok students=%s "
+        "completed=%s concurrency=%s total_ms=%s",
+        len(student_ids), completed, workers,
+        int((time.perf_counter() - started) * 1000))
     return jsonify({"results": results, "completed": completed,
                     "total": len(results)})
 
@@ -1184,7 +1296,7 @@ def bulk_download_reports():
             try:
                 rendered = _saved_pdf(student_id, month)
             except (reporting_db.ReportingUnavailable, report_pdf.PdfTooLong):
-                logger.info("admin_bulk_pdf_skipped student_id=%s", student_id)
+                logger.info("admin_bulk_pdf_skipped")
                 continue
             if rendered is None:
                 continue
@@ -1215,8 +1327,7 @@ def save_report(student_id):
     month = _month_or_400()
     payload = report_input.build_report_input(student_id, month)
     if not (payload.get("profile") or {}).get("reporting_enabled", True):
-        logger.info("admin_report_save_blocked code=report_disabled "
-                    "student_id=%s", student_id)
+        logger.info("admin_report_save_blocked code=report_disabled")
         return _render_student(student_id, month, payload,
                                ai_error=ERROR_REPORT_DISABLED), 200
     try:

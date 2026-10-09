@@ -3,8 +3,9 @@
 DVIJE TVRDNJE:
   1. SIGURNOST — generisanje, snimanje i PDF su iza administratorske prijave i
      CSRF-a; tutorski token ovdje ne znači ništa.
-  2. TROŠAK JE OGRANIČEN — model se zove TAČNO jednom, i to samo na izričito
-     „Generiši". Otvaranje stranice, snimanje izmjena i preuzimanje PDF-a ne
+  2. TROŠAK JE OGRANIČEN — model se zove TAČNO jednom po običnom pokušaju i
+     samo na izričito „Generiši". Jedini izuzetak je jedan dokazano privremeni
+     bulk retry. Otvaranje stranice, snimanje izmjena i preuzimanje PDF-a ne
      zovu model NIKAD. To se mjeri brojačem, ne pretpostavlja.
 
 Druga tvrdnja je razlog zašto ovaj fajl postoji odvojeno: administrator koji
@@ -13,12 +14,13 @@ koji se primijeti tek na računu.
 """
 import io
 import re
+import threading
 import zipfile
 
 import pytest
 from werkzeug.datastructures import MultiDict
 
-from matbot import (activity, parent_report, report_facts, report_input,
+from matbot import (activity, admin_reports, parent_report, report_facts, report_input,
                     reporting_db, reporting_schema)
 from matbot.student_identity import PROVIDER_THINKIFIC_EMAIL
 
@@ -381,6 +383,128 @@ def test_bulk_generation_reuses_a_saved_report_without_a_model_call(
     })
     assert response.get_json()["results"][0]["status"] == "reused"
     assert counter.calls == 0
+
+
+def test_bulk_generation_runs_two_independent_model_waits_concurrently(
+        admin, db, student, monkeypatch):
+    """Barijera dokazuje preklapanje bez krhkog wall-clock praga."""
+    database = reporting_db.get_database()
+    other = database.create_student("Drugi Učenik", 7,
+                                    "bulk-concurrent@example.com")
+    _add_report_activity(student, "bulk-concurrent-one")
+    _add_report_activity(other, "bulk-concurrent-two")
+    barrier = threading.Barrier(2, timeout=2.0)
+    calls = []
+
+    class ConcurrentLLM:
+        def report_turn(self, instructions, input_text):
+            calls.append(1)
+            barrier.wait()
+            from matbot.llm import LLMResult
+            return LLMResult(output=good_narrative())
+
+    monkeypatch.setattr("matbot.llm.OpenAIPracticeLLM", ConcurrentLLM)
+    token = _csrf_from(admin.get("/admin/reports/students?month=2026-08"))
+    response = admin.post("/admin/reports/bulk/generate", data=MultiDict([
+        ("csrf_token", token), ("month", "2026-08"),
+        ("student_ids", str(student)), ("student_ids", str(other)),
+    ]))
+
+    assert response.status_code == 200
+    assert [item["status"] for item in response.get_json()["results"]] == [
+        "ready", "ready"]
+    assert len(calls) == 2
+
+
+def test_bulk_retries_one_transient_model_failure_and_saves_once(
+        admin, db, student, monkeypatch):
+    from matbot import config
+    from matbot.llm import LLMResult, LLMTimeout
+
+    _add_report_activity(student, "bulk-transient")
+    calls = []
+
+    class TransientThenReady:
+        def report_turn(self, instructions, input_text):
+            calls.append(1)
+            if len(calls) == 1:
+                raise LLMTimeout(
+                    "timeout",
+                    diagnostics={"exception_class": "APITimeoutError"})
+            return LLMResult(output=good_narrative())
+
+    monkeypatch.setattr("matbot.llm.OpenAIPracticeLLM", TransientThenReady)
+    monkeypatch.setattr(config, "REPORTING_BULK_RETRY_BASE_S", 0.0)
+    token = _csrf_from(admin.get("/admin/reports/students?month=2026-08"))
+    response = admin.post("/admin/reports/bulk/generate", data={
+        "csrf_token": token, "month": "2026-08",
+        "student_ids": str(student),
+    })
+
+    assert response.get_json()["results"][0]["status"] == "ready"
+    assert len(calls) == 2
+    assert rows(db, "SELECT COUNT(*) FROM monthly_reports")[0][0] == 1
+
+
+def test_bulk_does_not_retry_permanent_model_failure(
+        admin, db, student, monkeypatch):
+    from matbot.llm import LLMUnavailable
+
+    _add_report_activity(student, "bulk-permanent")
+    calls = []
+
+    class PermanentFailure:
+        def report_turn(self, instructions, input_text):
+            calls.append(1)
+            raise LLMUnavailable(
+                "auth",
+                diagnostics={"exception_class": "AuthenticationError"})
+
+    monkeypatch.setattr("matbot.llm.OpenAIPracticeLLM", PermanentFailure)
+    token = _csrf_from(admin.get("/admin/reports/students?month=2026-08"))
+    response = admin.post("/admin/reports/bulk/generate", data={
+        "csrf_token": token, "month": "2026-08",
+        "student_ids": str(student),
+    })
+
+    assert response.get_json()["results"][0]["status"] == "error"
+    assert len(calls) == 1
+    assert rows(db, "SELECT COUNT(*) FROM monthly_reports")[0][0] == 0
+
+
+def test_same_student_cannot_generate_twice_concurrently(
+        db, student, monkeypatch):
+    from matbot.llm import LLMResult
+
+    _add_report_activity(student, "same-student-inflight")
+    entered = threading.Event()
+    release = threading.Event()
+    calls = []
+
+    class BlockingLLM:
+        def report_turn(self, instructions, input_text):
+            calls.append(1)
+            entered.set()
+            assert release.wait(2.0)
+            return LLMResult(output=good_narrative())
+
+    monkeypatch.setattr("matbot.llm.OpenAIPracticeLLM", BlockingLLM)
+    first = []
+    worker = threading.Thread(target=lambda: first.append(
+        admin_reports._generate_one_report_with_retries(
+            student, "2026-08", replace=True, transient_retries=0)))
+    worker.start()
+    assert entered.wait(2.0)
+
+    duplicate = admin_reports._generate_one_report_with_retries(
+        student, "2026-08", replace=True, transient_retries=0)
+    release.set()
+    worker.join(2.0)
+
+    assert duplicate[1:] == ("error", admin_reports.ERROR_GENERATION_IN_PROGRESS)
+    assert first and first[0][1] == "ready"
+    assert len(calls) == 1
+    assert rows(db, "SELECT COUNT(*) FROM monthly_reports")[0][0] == 1
 
 
 def test_all_declared_narrative_sections_are_saved_and_reports_are_isolated(

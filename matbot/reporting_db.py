@@ -229,6 +229,11 @@ class ReportingDatabase:
         # Isto za čas kao objekat (šema v6).
         self._session_v6 = None
         self._student_profile_v7 = None
+        # Uspjesna provjera tabele mjesecnih izvjestaja pripada ovoj konekciji.
+        # Struktura se mijenja samo u deploy migraciji, prije pokretanja web
+        # procesa, pa ponavljanje 6-7 PRAGMA upita pri SVAKOM citanju ne daje
+        # dodatnu sigurnost -- samo pravi udaljene Turso round-tripove.
+        self._monthly_reports_capabilities_cache = None
 
     # -- konekcija ---------------------------------------------------------
     def _connection(self):
@@ -270,6 +275,7 @@ class ReportingDatabase:
         self._session_v5 = None
         self._session_v6 = None
         self._student_profile_v7 = None
+        self._monthly_reports_capabilities_cache = None
         if conn is not None:
             self._discard(conn)
 
@@ -1481,6 +1487,137 @@ class ReportingDatabase:
             for row in rows
         }
 
+    def fetch_report_roster_metrics(self, student_ids, report_month,
+                                    previous_report_month, month_start,
+                                    next_month_start):
+        """Sazete metrike radne liste u jednom upitu po najvise 400 ucenika.
+
+        Radna lista prikazuje samo postojanje Thinkific snimka, ukupni napredak,
+        broj prikazanih zadataka i broj zavrsenih kontrolnih. Ranije je za te
+        cetiri vrijednosti gradila *cijeli* izvjestaj svakog ucenika: profil,
+        casove, sve sekcije oba mjeseca, cetiri MAT-BOT agregacije i ishode po
+        lekciji. Na udaljenom libSQL-u to je bio N+1 problem od vise od deset
+        mreznih odlazaka po redu.
+
+        Ovaj upit namjerno ne vraca sekcije, komentare, ishode ni tekst
+        izvjestaja. Ti podaci ostaju lazy i citaju se tek na pojedinacnom
+        pregledu/generisanju. Izbor posljednjeg snimka (`MAX(id)`) cuva potpuno
+        istu semantiku kao `fetch_progress_snapshot(... ORDER BY id DESC LIMIT
+        1)`, ukljucujuci zajednicki nalog s dva kursa.
+        """
+        ids = list(dict.fromkeys(int(value) for value in student_ids))
+        result = {
+            student_id: {
+                "has_snapshot": False,
+                "percent_completed": None,
+                "delta_percent_completed": None,
+                "practice_tasks": 0,
+                "kontrolni_attempts": 0,
+            }
+            for student_id in ids
+        }
+        if not ids:
+            return result
+
+        from matbot import activity
+
+        with self._lock:
+            try:
+                conn = self._connection()
+                for chunk in _batches(ids, 400):
+                    selected = ",".join("(?)" for _ in chunk)
+                    sql = """
+                        WITH selected(student_id) AS (VALUES %s),
+                        current_ids AS (
+                            SELECT p.student_id, MAX(p.id) AS snapshot_id
+                            FROM thinkific_progress_snapshots p
+                            JOIN selected s ON s.student_id = p.student_id
+                            WHERE p.report_month = ?
+                            GROUP BY p.student_id
+                        ),
+                        current_progress AS (
+                            SELECT p.student_id, p.course_key,
+                                   p.percent_completed
+                            FROM thinkific_progress_snapshots p
+                            JOIN current_ids c ON c.snapshot_id = p.id
+                        ),
+                        prior_progress AS (
+                            SELECT current.student_id,
+                                   prior.percent_completed
+                            FROM current_progress current
+                            LEFT JOIN thinkific_progress_snapshots prior
+                              ON prior.id = (
+                                  SELECT MAX(candidate.id)
+                                  FROM thinkific_progress_snapshots candidate
+                                  WHERE candidate.student_id = current.student_id
+                                    AND candidate.report_month = ?
+                                    AND candidate.course_key = current.course_key
+                              )
+                        ),
+                        activity_totals AS (
+                            SELECT a.student_id,
+                                   SUM(CASE WHEN a.event_type = ? THEN 1 ELSE 0 END)
+                                       AS practice_tasks
+                            FROM learning_activity a
+                            JOIN selected s ON s.student_id = a.student_id
+                            WHERE a.source = ?
+                              AND a.occurred_at >= ? AND a.occurred_at < ?
+                            GROUP BY a.student_id
+                        ),
+                        assessment_totals AS (
+                            SELECT a.student_id, COUNT(*) AS attempts
+                            FROM assessment_attempts a
+                            JOIN selected s ON s.student_id = a.student_id
+                            WHERE a.source = ? AND a.completed_at IS NOT NULL
+                              AND a.completed_at >= ? AND a.completed_at < ?
+                            GROUP BY a.student_id
+                        )
+                        SELECT selected.student_id,
+                               current.student_id IS NOT NULL,
+                               current.percent_completed,
+                               CASE
+                                   WHEN current.percent_completed IS NULL
+                                     OR prior.percent_completed IS NULL THEN NULL
+                                   ELSE current.percent_completed
+                                      - prior.percent_completed
+                               END,
+                               COALESCE(activity.practice_tasks, 0),
+                               COALESCE(assessment.attempts, 0)
+                        FROM selected
+                        LEFT JOIN current_progress current
+                          ON current.student_id = selected.student_id
+                        LEFT JOIN prior_progress prior
+                          ON prior.student_id = selected.student_id
+                        LEFT JOIN activity_totals activity
+                          ON activity.student_id = selected.student_id
+                        LEFT JOIN assessment_totals assessment
+                          ON assessment.student_id = selected.student_id
+                        ORDER BY selected.student_id
+                    """ % selected
+                    params = (tuple(chunk)
+                              + (report_month, previous_report_month,
+                                 activity.PRACTICE_TASK_PRESENTED,
+                                 SOURCE, month_start, next_month_start,
+                                 SOURCE, month_start, next_month_start))
+                    rows = _rows(conn.execute(sql, params))
+                    for row in rows:
+                        result[int(row[0])] = {
+                            "has_snapshot": bool(row[1]),
+                            "percent_completed": row[2],
+                            "delta_percent_completed": row[3],
+                            "practice_tasks": int(row[4] or 0),
+                            "kontrolni_attempts": int(row[5] or 0),
+                        }
+            except ReportingUnavailable:
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "report_roster_metrics_failed:" + type(exc).__name__,
+                    exc) from None
+        return result
+
     def _require_monthly_reports(self, conn):
         """Padni ZATVORENO ako produkcijska tabela ne podnosi Fazu 3C.
 
@@ -1488,16 +1625,21 @@ class ReportingDatabase:
         # Lokalni import kao i u `check()` — izbjegava kružnu zavisnost.
         from matbot import reporting_schema
 
+        if self._monthly_reports_capabilities_cache is not None:
+            return
         problems = reporting_schema.verify_monthly_reports_schema(conn)
         if problems:
             raise ReportingUnavailable("monthly_reports_unusable:" + problems[0])
+        self._monthly_reports_capabilities_cache = (
+            reporting_schema.monthly_reports_capabilities(conn))
 
     def _monthly_reports_has_generated_at(self, conn):
         """Ima li zatečena tabela `generated_at`. Izmjerena produkcija ima."""
         from matbot import reporting_schema
 
-        return bool(reporting_schema.monthly_reports_capabilities(conn)
-                    .get("generated_at"))
+        if self._monthly_reports_capabilities_cache is None:
+            self._require_monthly_reports(conn)
+        return bool(self._monthly_reports_capabilities_cache.get("generated_at"))
 
     # --- ČITANJE (izvještajni model) ---------------------------------------
     def fetch_progress_snapshot(self, student_id, report_month, course_key=None):
@@ -1538,6 +1680,82 @@ class ReportingDatabase:
                 self._drop_connection()
                 raise ReportingUnavailable(
                     "snapshot_read_failed:" + type(exc).__name__, exc) from None
+
+    def fetch_progress_pair(self, student_id, report_month,
+                            previous_report_month):
+        """Tekući i odgovarajući prethodni snapshot sa sekcijama, jednim upitom.
+
+        Prethodni kurs se bira tek iz stvarno odabranog tekućeg snimka, isto kao
+        u dva stara `fetch_progress_snapshot` poziva. `MAX(id)` čuva postojeću
+        `ORDER BY id DESC LIMIT 1` semantiku za zajedničke naloge.
+        """
+        with self._lock:
+            try:
+                conn = self._connection()
+                rows = _rows(conn.execute(
+                    "WITH current_snapshot AS ("
+                    " SELECT * FROM thinkific_progress_snapshots "
+                    " WHERE id = (SELECT MAX(id) "
+                    "             FROM thinkific_progress_snapshots "
+                    "             WHERE student_id = ? AND report_month = ?)"
+                    "), prior_snapshot AS ("
+                    " SELECT * FROM thinkific_progress_snapshots "
+                    " WHERE id = (SELECT MAX(p.id) "
+                    "             FROM thinkific_progress_snapshots p "
+                    "             JOIN current_snapshot c "
+                    "               ON c.student_id = p.student_id "
+                    "              AND c.course_key = p.course_key "
+                    "             WHERE p.report_month = ?)"
+                    "), chosen AS ("
+                    " SELECT 0 AS period_order, 'current' AS period, * "
+                    " FROM current_snapshot "
+                    " UNION ALL "
+                    " SELECT 1 AS period_order, 'prior' AS period, * "
+                    " FROM prior_snapshot"
+                    ") "
+                    "SELECT chosen.period, chosen.id, chosen.course_key, "
+                    " chosen.course_name, chosen.grade, chosen.percent_viewed, "
+                    " chosen.percent_completed, chosen.started_at, "
+                    " chosen.completed_at, chosen.activated_at, "
+                    " chosen.expires_at, chosen.last_sign_in, "
+                    " section.ordinal, section.section_name, "
+                    " section.progress_percent "
+                    "FROM chosen "
+                    "LEFT JOIN thinkific_progress_sections section "
+                    "  ON section.snapshot_id = chosen.id "
+                    "ORDER BY chosen.period_order, section.ordinal, section.id",
+                    (int(student_id), report_month,
+                     previous_report_month)))
+            except ReportingUnavailable:
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "snapshot_pair_read_failed:" + type(exc).__name__,
+                    exc) from None
+
+        snapshots = {}
+        for row in rows:
+            period = row[0]
+            snapshot = snapshots.get(period)
+            if snapshot is None:
+                snapshot = {
+                    "snapshot_id": row[1], "course_key": row[2],
+                    "course_name": row[3], "grade": row[4],
+                    "percent_viewed": row[5], "percent_completed": row[6],
+                    "started_at": row[7], "completed_at": row[8],
+                    "activated_at": row[9], "expires_at": row[10],
+                    "last_sign_in": row[11], "sections": [],
+                }
+                snapshots[period] = snapshot
+            # LEFT JOIN proizvodi jedan prazan section red kad sekcija nema.
+            if row[13] is not None:
+                snapshot["sections"].append({
+                    "ordinal": row[12], "section_name": row[13],
+                    "progress_percent": row[14],
+                })
+        return snapshots.get("current"), snapshots.get("prior")
 
     def fetch_student_profile(self, student_id):
         """Profil + STANJE POTVRDE tekućeg razreda.
@@ -3160,35 +3378,49 @@ class ReportingDatabase:
         with self._lock:
             try:
                 conn = self._connection()
-                counts = dict(_rows(conn.execute(
-                    "SELECT event_type, COUNT(*) FROM learning_activity "
-                    "WHERE student_id = ? AND source = ? "
-                    "AND occurred_at >= ? AND occurred_at < ? GROUP BY event_type",
-                    (int(student_id), SOURCE, month_start, next_month_start))))
-                active_days = _rows(conn.execute(
-                    "SELECT COUNT(DISTINCT date(occurred_at)) FROM learning_activity "
-                    "WHERE student_id = ? AND source = ? "
-                    "AND occurred_at >= ? AND occurred_at < ?",
-                    (int(student_id), SOURCE, month_start, next_month_start)))[0][0]
-                exams = _rows(conn.execute(
-                    "SELECT COUNT(*), AVG(score_percent), SUM(correct_count), "
-                    "SUM(total_count) FROM assessment_attempts "
-                    "WHERE student_id = ? AND source = ? AND completed_at IS NOT NULL "
-                    "AND completed_at >= ? AND completed_at < ?",
-                    (int(student_id), SOURCE, month_start, next_month_start)))[0]
-                outcomes = _rows(conn.execute(
-                    "SELECT i.lesson_id, i.lesson_name, i.area_name, i.difficulty, "
-                    "       SUM(CASE WHEN i.is_correct = 0 THEN 1 ELSE 0 END), "
-                    "       COUNT(*) "
+                rows = _rows(conn.execute(
+                    "WITH month_events AS ("
+                    " SELECT event_type, occurred_at FROM learning_activity "
+                    " WHERE student_id = ? AND source = ? "
+                    "   AND occurred_at >= ? AND occurred_at < ?"
+                    "), month_attempts AS ("
+                    " SELECT id, score_percent, correct_count, total_count "
+                    " FROM assessment_attempts "
+                    " WHERE student_id = ? AND source = ? "
+                    "   AND completed_at IS NOT NULL "
+                    "   AND completed_at >= ? AND completed_at < ?"
+                    ") "
+                    "SELECT 'count', event_type, COUNT(*), NULL, NULL, NULL, NULL "
+                    "FROM month_events GROUP BY event_type "
+                    "UNION ALL "
+                    "SELECT 'active', COUNT(DISTINCT date(occurred_at)), "
+                    " NULL, NULL, NULL, NULL, NULL FROM month_events "
+                    "UNION ALL "
+                    "SELECT 'exams', COUNT(*), AVG(score_percent), "
+                    " SUM(correct_count), SUM(total_count), NULL, NULL "
+                    "FROM month_attempts "
+                    "UNION ALL "
+                    "SELECT 'outcome', i.lesson_id, i.lesson_name, i.area_name, "
+                    " i.difficulty, "
+                    " SUM(CASE WHEN i.is_correct = 0 THEN 1 ELSE 0 END), "
+                    " COUNT(*) "
                     "FROM assessment_item_results i "
-                    "JOIN assessment_attempts a ON a.id = i.attempt_id "
-                    "WHERE a.student_id = ? AND a.source = ? "
-                    "AND a.completed_at IS NOT NULL "
-                    "AND a.completed_at >= ? AND a.completed_at < ? "
-                    "AND i.lesson_id IS NOT NULL "
-                    "GROUP BY i.lesson_id, i.lesson_name, i.area_name, i.difficulty "
-                    "ORDER BY 5 DESC, i.lesson_id",
-                    (int(student_id), SOURCE, month_start, next_month_start)))
+                    "JOIN month_attempts a ON a.id = i.attempt_id "
+                    "WHERE i.lesson_id IS NOT NULL "
+                    "GROUP BY i.lesson_id, i.lesson_name, i.area_name, "
+                    " i.difficulty",
+                    (int(student_id), SOURCE, month_start, next_month_start,
+                     int(student_id), SOURCE, month_start, next_month_start)))
+                counts = {row[1]: row[2] for row in rows
+                          if row[0] == "count"}
+                active = [row for row in rows if row[0] == "active"]
+                active_days = active[0][1] if active else 0
+                exam_rows = [row for row in rows if row[0] == "exams"]
+                exams = tuple(exam_rows[0][1:5]) if exam_rows else (
+                    0, None, None, None)
+                outcomes = [tuple(row[1:7]) for row in rows
+                            if row[0] == "outcome"]
+                outcomes.sort(key=lambda row: (-(row[4] or 0), row[0] or ""))
                 return {"counts": counts, "active_days": active_days,
                         "exams": exams, "lesson_outcomes": outcomes}
             except ReportingUnavailable:
@@ -3291,6 +3523,7 @@ class ReportingDatabase:
                 self._session_v5 = None
                 self._session_v6 = None
                 self._student_profile_v7 = None
+                self._monthly_reports_capabilities_cache = None
             except reporting_schema.MigrationError:
                 self._drop_connection()
                 raise
@@ -3299,6 +3532,48 @@ class ReportingDatabase:
                 raise ReportingUnavailable(
                     "migration_failed:" + type(exc).__name__, exc) from None
         return applied
+
+    def check_reports_readiness(self):
+        """Minimalna web provjera koju koristi administratorski Reports UI.
+
+        Operatorski `check()` namjerno radi duboku introspekciju cijele seme i
+        ostaje izvor istine za deploy/CLI. Web guard je iz njegovog rezultata
+        oduvijek citao samo tri stvari: radi li konekcija, koja je verzija i
+        postoje li tri v2 Thinkific tabele. Dobavljanje tih istih vrijednosti
+        jednim upitom uklanja desetine udaljenih PRAGMA round-tripova sa svakog
+        otvaranja, pretrage i filtera, bez slabljenja odluke koju web kod donosi.
+        """
+        with self._lock:
+            try:
+                conn = self._connection()
+                rows = _rows(conn.execute(
+                    "SELECT "
+                    " (SELECT MAX(version) FROM schema_migrations), "
+                    " SUM(CASE WHEN name = ? THEN 1 ELSE 0 END), "
+                    " SUM(CASE WHEN name = ? THEN 1 ELSE 0 END), "
+                    " SUM(CASE WHEN name = ? THEN 1 ELSE 0 END) "
+                    "FROM sqlite_master WHERE type = 'table'",
+                    (
+                        "thinkific_progress_imports",
+                        "thinkific_progress_snapshots",
+                        "thinkific_progress_sections",
+                    )))
+                row = rows[0] if rows else (None, 0, 0, 0)
+                names = ("thinkific_progress_imports",
+                         "thinkific_progress_snapshots",
+                         "thinkific_progress_sections")
+                missing = [name for name, present in zip(names, row[1:])
+                           if not present]
+                return {"connected": True, "schema_version": row[0],
+                        "missing_tables": missing}
+            except ReportingUnavailable:
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "reporting_db_readiness_failed:" + type(exc).__name__,
+                    exc) from None
 
     def check(self):
         """SAMO ČITANJE — dijagnostika za CLI (Dio 11). Nikad ne piše, nikad ne
