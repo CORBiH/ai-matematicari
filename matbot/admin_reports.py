@@ -1105,8 +1105,24 @@ def _generate_one_report_unlocked(student_id, month, *, replace):
         logger.info("admin_report_generate_blocked code=grade_unconfirmed")
         return payload, "error", ERROR_GRADE_UNCONFIRMED
 
+    parent_comments = list(
+        (payload.get("instruction") or {}).get("parent_comments") or [])
+    comments_were_edited = bool(
+        ((saved_before or {}).get("snapshot") or {}).get(
+            "parent_comments_edited"))
+    if comments_were_edited:
+        parent_comments = list(saved_before.get("parent_comments") or [])
+
+    # Model i sačuvani dokument moraju dobiti isti skup zapažanja. Kopija čuva
+    # originalni deterministički payload netaknutim, a uređeni komentar iz
+    # ranijeg izvještaja ne vraća se u izvornu evidenciju časa.
+    facts_payload = dict(payload)
+    facts_instruction = dict(payload.get("instruction") or {})
+    facts_instruction["parent_comments"] = parent_comments
+    facts_payload["instruction"] = facts_instruction
+
     facts_started = time.perf_counter()
-    facts = report_facts.build_ai_facts(payload)
+    facts = report_facts.build_ai_facts(facts_payload)
     facts_ms = int((time.perf_counter() - facts_started) * 1000)
     from matbot import llm as llm_module
 
@@ -1134,12 +1150,6 @@ def _generate_one_report_unlocked(student_id, month, *, replace):
         _REPORT_MODEL_SLOTS.release()
     ai_ms = int((time.perf_counter() - ai_started) * 1000)
 
-    parent_comments = (payload.get("instruction") or {}).get("parent_comments")
-    comments_were_edited = bool(
-        ((saved_before or {}).get("snapshot") or {}).get(
-            "parent_comments_edited"))
-    if comments_were_edited:
-        parent_comments = saved_before.get("parent_comments") or []
     snapshot = parent_report.metrics_snapshot(
         facts, model=config.REPORTING_MODEL,
         prompt_version=report_prompt.REPORT_PROMPT_VERSION,

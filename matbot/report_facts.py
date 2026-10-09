@@ -4,8 +4,10 @@ Ovaj modul stoji između `report_input.build_report_input` (potpuno deterministi
 izvještajni ulaz) i modela koji piše prozu za roditelja. Radi tačno dvije stvari:
 
   1. SUZI — iz administratorskog objekta izvuče samo ona polja koja su potrebna
-     da bi se napisala rečenica, i ništa više. Sve što je PII ili interni
-     identifikator ostaje s ove strane granice.
+     da bi se napisala rečenica, i ništa više. Strukturirani PII i interni
+     identifikatori ostaju s ove strane granice. Jedini slobodan tekst su
+     datirana zapažanja instruktora koja proizvod izričito šalje kao
+     nepovjerljiv kvalitativni kontekst.
   2. ODLUČI — svaki zaključak o dokaznoj snazi donese deterministički, u
      Pythonu, i modelu preda GOTOVU OZNAKU (`evidence_level`), ne sirove
      brojače iz kojih bi model sam procjenjivao koliko je nešto pouzdano.
@@ -21,8 +23,9 @@ označava. Jedini izuzeci su `answers_total = correct + incorrect` i
 
 NE ŠALJE SE MODELU: e-mail, `student_id`, Thinkific vanjski ID, `lesson_id`,
 `course_key`, sirovi tekst pitanja/odgovora, razgovori, `display_name`. Ime
-učenika ispisuje PDF predložak — model ga ne treba da bi napisao izvještaj, a
-svako ime koje model ne vidi je ime koje ne može procuriti ni pogrešno sklonuti.
+učenika ispisuje PDF predložak — model ga ne treba da bi napisao izvještaj.
+Tekst nastavničkog zapažanja ostaje autentičan i može sadržati ono što je
+instruktor sam unio; zato se nikad ne loguje i prompt ga tretira kao podatak.
 """
 
 # --- DOKAZNA POLITIKA ------------------------------------------------------
@@ -124,22 +127,35 @@ MAX_PARENT_SECTIONS = 3
 def _instruction_facts(instruction):
     """Faza 3D — časovi u ugovoru prema modelu.
 
-    SLOBODAN TEKST NE ULAZI. `parent_comments` su zapažanja instruktora i mogu
-    slučajno nositi lični podatak, pa ostaju u PDF-u i administratorskom
-    pregledu, a modelu se ne šalju NIKAD (Dio 20). Model dobija samo brojeve,
-    kanonske nazive gradiva i gotove signale."""
+    Autentična zapažanja instruktora ulaze kao jasno označeni NEPOVJERLJIVI
+    podaci. Redoslijed i datum ostaju sačuvani, tekst se ne prepravlja, a prompt
+    izričito zabranjuje da se sadržaj komentara tretira kao naredba modelu."""
+    from matbot import student_sessions
+
     instruction = instruction or {}
-    activity = instruction.get("activity") or {}
     homework = instruction.get("homework") or {}
+    comments = []
+    for entry in instruction.get("parent_comments") or []:
+        if not isinstance(entry, dict):
+            continue
+        text = str(entry.get("comment") or "").strip()
+        if not text:
+            continue
+        comments.append({
+            "date": entry.get("date"),
+            "comment": text[:student_sessions.MAX_COMMENT_CHARS],
+        })
+        if len(comments) >= student_sessions.MAX_PARENT_COMMENTS:
+            break
+    excluded_signals = {
+        student_sessions.SIGNAL_STRONG_ENGAGEMENT,
+        student_sessions.SIGNAL_ENGAGEMENT_NEEDS_SUPPORT,
+    }
     return {
         "available": bool(instruction.get("available")),
         "sessions_total": int(instruction.get("sessions_total") or 0),
         "present_count": int(instruction.get("present_count") or 0),
         "absent_count": int(instruction.get("absent_count") or 0),
-        # Prosjek ostaje None kad nema ocijenjenih časova — 0/5 bi bila
-        # izmišljena mjera o učeniku koji nije ocijenjen.
-        "activity_average": activity.get("average"),
-        "activity_rated_sessions": int(activity.get("rated_sessions") or 0),
         "homework_assigned": int(homework.get("assigned_count") or 0),
         "homework_done": int(homework.get("done_count") or 0),
         "homework_not_done": int(homework.get("not_done_count") or 0),
@@ -150,9 +166,11 @@ def _instruction_facts(instruction):
         # broji u prisustvu, angažmanu i zadaći — samo se ne imenuje kao lekcija.
         "areas_worked": list(instruction.get("areas_worked") or [])[:MAX_LESSON_ROWS],
         "lessons_worked": list(instruction.get("lessons_worked") or [])[:MAX_LESSON_ROWS],
-        # Signali su SERVERSKA odluka. Bez njih bi model sam procjenjivao da je
-        # „prisustvo odlično" na osnovu dva časa.
-        "signals": list(instruction.get("signals") or []),
+        "teacher_comments": comments,
+        # Signali su SERVERSKA odluka. Istorijski signali izvedeni iz
+        # numeričkih procjena izričito se uklanjaju iz novog AI ugovora.
+        "signals": [signal for signal in (instruction.get("signals") or [])
+                    if signal not in excluded_signals],
     }
 
 
@@ -414,34 +432,11 @@ def allowed_numbers(facts):
         for key in ("incorrect_items", "correct_items", "evidence_items"):
             add(lesson.get(key))
 
-    # Faza 3D: brojke s časova su izmjerene isto kao i sve ostale.
+    # Faza 3D: objektivne brojke s časova su izmjerene isto kao i sve ostale.
     instruction = facts.get("instruction") or {}
     for key in ("sessions_total", "present_count", "absent_count",
-                "activity_average", "activity_rated_sessions",
                 "homework_assigned", "homework_done", "homework_not_done"):
         add(instruction.get(key))
-
-    # GRANICE SKALE ANGAŽMANA SU ČINJENICA O MJERI, NE IZMIŠLJEN BROJ.
-    #
-    # ŽIVI NALAZ (izdanje 1ed172c): prompt 3d-2 IZRIČITO traži rečenicu
-    # „Prosječna aktivnost na časovima bila je 4,0 / 5.", a ovaj validator je
-    # peticu odbijao kao izmišljen broj kad se nijedna izmjerena vrijednost nije
-    # slučajno poklopila s njom. Mjesec sa četiri časa (3 prisutna, prosjek 4,0)
-    # je zato padao zatvoreno — prompt i provjera su tvrdili suprotno.
-    # Nedostupnost, ne netačnost, ali svejedno kvar.
-    #
-    # `ACTIVITY_MIN`/`ACTIVITY_MAX` dolaze iz `student_sessions`, gdje skala i
-    # živi — ovdje se namjerno NE prepisuju kao brojevi, da ne bi postojala dva
-    # izvora istine o istoj skali.
-    #
-    # SAMO KAD ANGAŽMAN STVARNO POSTOJI. Bez ijednog ocijenjenog časa granice se
-    # ne dodaju: proizvod podržava skalu uvijek, ali izvještaj bez mjerenja nema
-    # o čemu da govori, pa mu ni brojevi skale nisu činjenica.
-    if int(instruction.get("activity_rated_sessions") or 0) >= 1:
-        from matbot import student_sessions
-
-        add(student_sessions.ACTIVITY_MIN)
-        add(student_sessions.ACTIVITY_MAX)
 
     add(facts.get("grade"))
     for grade in facts.get("grades") or ():

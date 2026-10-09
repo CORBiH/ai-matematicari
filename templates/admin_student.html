@@ -26,6 +26,7 @@
 {% else %}
 {% set t = payload.thinkific %}
 {% set m = payload.matbot %}
+{% set i = payload.instruction %}
 
 {% if payload.profile.shared_account %}
 <div class="banner warn">Aktivnost pripada zajedničkom Thinkific nalogu za oba razreda. Sistem ne može pouzdano odrediti koje je dijete napravilo pojedini događaj, pa se podaci ne dupliraju niti razdvajaju.</div>
@@ -62,6 +63,12 @@
     <h2>Preporuke za naredni mjesec</h2>
     {% if saved.narrative.next_month_recommendations %}<ul>{% for item in saved.narrative.next_month_recommendations %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p class="muted">Nema unesenih stavki.</p>{% endif %}
   </section>
+  {% if saved.parent_comments %}
+  <section class="report-document__section">
+    <h2>Zapažanja sa časova</h2>
+    <ul>{% for entry in saved.parent_comments %}{% if entry.comment %}<li><b>{{ entry.date }}</b> — {{ entry.comment }}</li>{% endif %}{% endfor %}</ul>
+  </section>
+  {% endif %}
   {% if saved.instructor_comment %}
   <section class="report-document__section"><h2>Komentar instruktora</h2><p>{{ saved.instructor_comment }}</p></section>
   {% endif %}
@@ -83,7 +90,24 @@
 
 <section class="card">
   <div class="section-header">
-    <div><h2>Podaci mjeseca</h2><p>Činjenice iz Thinkifica i MAT-BOT aktivnosti.</p></div>
+    <div><h2>Podaci mjeseca</h2><p>Činjenice sa časova, iz Thinkifica i MAT-BOT aktivnosti.</p></div>
+  </div>
+
+  <div class="report-document__section">
+    <h2>Rad na časovima</h2>
+    {% if not i.available %}
+      <p class="muted">Nema evidentiranih časova u ovom mjesecu.</p>
+    {% else %}
+      <div class="grid">
+        <div class="stat"><b>{{ i.sessions_total }}</b><span class="muted">evidentiranih časova</span></div>
+        <div class="stat"><b>{{ i.present_count }} od {{ i.sessions_total }}</b><span class="muted">prisustvo</span></div>
+        <div class="stat"><b>{{ i.homework.done_count }} od {{ i.homework.assigned_count }}</b><span class="muted">urađena zadaća</span></div>
+      </div>
+      {% if not saved and i.parent_comments %}
+      <h3>Zapažanja instruktora</h3>
+      <ul>{% for entry in i.parent_comments %}<li><b>{{ entry.date }}</b> — {{ entry.comment }}</li>{% endfor %}</ul>
+      {% endif %}
+    {% endif %}
   </div>
 
   <div class="report-document__section">

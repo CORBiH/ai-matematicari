@@ -288,13 +288,10 @@ def test_13_to_16_the_detail_page_shows_exactly_this_class(admin, db):
     assert "Prisutan Ucenik" in body and "Odsutan Ucenik" in body
     assert "Druga Grupa" not in body, "učenik koji nije na času je prikazan"
     assert "7. razred" in body and DATE in body and MORNING in body
-    # 15) kanonske oznake aktivnosti; aktivnost se NIKAD ne zove ocjenom —
-    # jedina dozvoljena pojava te riječi je napomena da to NIJE ocjena.
-    assert "4 — aktivan i uglavnom samostalan" in body
-    for row in re.findall(r"<td>([^<]*)</td>", body):
-        assert "ocjen" not in row.lower(), row
-    assert "ne ocjena iz matematike" in body
-    # 16) odsutan nema aktivnost
+    # Numerička nastavna procjena više nije dio pregleda časa.
+    assert "Aktivnost" not in body
+    assert "4 —" not in body
+    # Zapažanje i prisustvo ostaju vidljivi.
     assert "Odsutan" in body
     assert "dobar rad" in body
 
@@ -332,8 +329,8 @@ def test_19_editing_one_class_does_not_change_another(admin, db):
     save_class(admin, {b: present(activity="5")}, time=AFTERNOON,
                class_id=second)
 
-    assert db.fetch_sessions(a)[0]["activity_rating"] == 4
-    assert db.fetch_sessions(b)[0]["activity_rating"] == 5
+    assert db.fetch_sessions(a)[0]["activity_rating"] is None
+    assert db.fetch_sessions(b)[0]["activity_rating"] is None
     assert len(db.fetch_sessions(a)) == 1 and len(db.fetch_sessions(b)) == 1
 
 
@@ -472,14 +469,17 @@ def test_23b_a_failing_delete_rolls_back_completely(admin, db, monkeypatch):
 # ===========================================================================
 def test_24_deleting_a_class_removes_exactly_its_evidence(admin, db):
     a = student(db, "A")
-    first = save_class(admin, {a: present(activity="4", homework="done")},
+    first = save_class(admin, {a: present(activity="4", homework="done",
+                                           comment="prvo zapažanje")},
                        date="2026-09-01", time=MORNING)
-    save_class(admin, {a: present(activity="2", homework="not_done")},
+    save_class(admin, {a: present(activity="2", homework="not_done",
+                                  comment="drugo zapažanje")},
                date="2026-09-02", time=MORNING)
 
     before = report_input.build_instruction_section(a, "2026-09", database=db)
     assert before["sessions_total"] == 2
-    assert before["activity"]["average"] == 3.0
+    assert [row["comment"] for row in before["parent_comments"]] == [
+        "drugo zapažanje", "prvo zapažanje"]
 
     page = admin.get("/admin/sessions/%d/delete" % first)
     admin.post("/admin/sessions/%d/delete" % first,
@@ -488,22 +488,27 @@ def test_24_deleting_a_class_removes_exactly_its_evidence(admin, db):
     after = report_input.build_instruction_section(a, "2026-09", database=db)
     assert after["sessions_total"] == 1
     assert after["present_count"] == 1
-    assert after["activity"]["average"] == 2.0
+    assert after["activity"]["average"] is None
+    assert after["parent_comments"] == [{
+        "date": "2026-09-02", "comment": "drugo zapažanje"}]
     assert after["homework"]["done_count"] == 0
     assert after["homework"]["not_done_count"] == 1
 
 
 def test_24b_editing_a_class_changes_future_report_facts(admin, db):
     a = student(db, "A")
-    class_id = save_class(admin, {a: present(activity="2", homework="not_done")})
+    class_id = save_class(admin, {a: present(activity="2", homework="not_done",
+                                             comment="prije izmjene")})
     before = report_input.build_instruction_section(a, "2026-09", database=db)
-    assert before["activity"]["average"] == 2.0
+    assert before["parent_comments"][0]["comment"] == "prije izmjene"
 
-    save_class(admin, {a: present(activity="5", homework="done")},
+    save_class(admin, {a: present(activity="5", homework="done",
+                                  comment="poslije izmjene")},
                class_id=class_id)
 
     after = report_input.build_instruction_section(a, "2026-09", database=db)
-    assert after["activity"]["average"] == 5.0
+    assert after["activity"]["average"] is None
+    assert after["parent_comments"][0]["comment"] == "poslije izmjene"
     assert after["homework"]["done_count"] == 1
     assert after["sessions_total"] == 1, "izmjena je napravila drugi čas"
 
@@ -690,7 +695,7 @@ def test_37_no_model_call_is_involved(admin, db, flask_app):
 def test_37b_the_report_prompt_version_is_unchanged():
     from matbot import report_prompt
 
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-3"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-4"
 
 
 # ===========================================================================

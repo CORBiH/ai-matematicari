@@ -733,6 +733,11 @@ def test_parent_facing_class_observation_has_a_report_level_override(
     }]
     assert saved["snapshot"]["facts"] == facts
 
+    report_page = admin.get(
+        "/admin/reports/student/%d?month=2026-08" % student)
+    assert "Ispravljeno zapažanje za roditelja.".encode() in report_page.data
+    assert "Prosječna aktivnost".encode() not in report_page.data
+
     pdf = admin.get("/admin/reports/student/%d/pdf?month=2026-08" % student)
     text = "\n".join(page.extract_text() for page in
                      pypdf.PdfReader(io.BytesIO(pdf.data)).pages)
@@ -747,6 +752,8 @@ def test_parent_facing_class_observation_has_a_report_level_override(
     regenerated = parent_report.load_saved(student, "2026-08")
     assert regenerated["parent_comments"] == saved["parent_comments"]
     assert regenerated["snapshot"]["parent_comments_edited"] is True
+    assert regenerated["snapshot"]["facts"]["instruction"][
+        "teacher_comments"] == saved["parent_comments"]
     assert counter.calls == 1
 
 

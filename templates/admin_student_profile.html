@@ -155,16 +155,15 @@
         <div class="field"><label for="session-time">Vrijeme</label><input id="session-time" type="time" name="session_time" required></div>
         <fieldset><legend>Prisustvo</legend>
           <div class="seg">
-            <input id="attendance-present" type="radio" name="attendance" value="present" checked onclick="document.getElementById('act').disabled=false"><label for="attendance-present">Prisutan</label>
-            <input id="attendance-absent" type="radio" name="attendance" value="absent" onclick="var a=document.getElementById('act');a.value='';a.disabled=true"><label for="attendance-absent">Odsutan</label>
+            <input id="attendance-present" type="radio" name="attendance" value="present" checked><label for="attendance-present">Prisutan</label>
+            <input id="attendance-absent" type="radio" name="attendance" value="absent"><label for="attendance-absent">Odsutan</label>
           </div>
         </fieldset>
-        <div class="field"><label for="act">Aktivnost na času <span class="muted">(angažman)</span></label><select name="activity_rating" id="act"><option value="">—</option>{% for value, text in activity_labels.items() %}<option value="{{ value }}">{{ value }} — {{ text }}</option>{% endfor %}</select></div>
         <fieldset><legend>Zadaća</legend><div class="seg">{% for value, text in homework_labels.items() %}<input id="homework-{{ value }}" type="radio" name="homework_status" value="{{ value }}" {% if value == 'not_assigned' %}checked{% endif %}><label for="homework-{{ value }}">{{ text }}</label>{% endfor %}</div></fieldset>
         <div class="field"><label for="area">Oblast</label><select name="area_name" id="area" onchange="matbotFillLessons()"><option value="">—</option>{% for area in areas %}<option value="{{ area }}">{{ area }}</option>{% endfor %}</select></div>
         <div class="field"><label for="lesson">Lekcija</label><select name="lesson_name" id="lesson"><option value="">—</option></select></div>
       </div>
-      <div class="field" style="margin-top:.8rem"><label for="session-comment">Komentar</label><textarea id="session-comment" name="comment" rows="3" maxlength="1000"></textarea></div>
+      <div class="field" style="margin-top:.8rem"><label for="session-comment">Zapažanje instruktora</label><textarea id="session-comment" name="comment" rows="3" maxlength="1000"></textarea></div>
       <button type="submit" style="margin-top:.8rem">Sačuvaj čas</button>
     </form>
     <script type="application/json" id="curricula">{{ curricula|tojson }}</script>
@@ -181,15 +180,14 @@
   <div class="section-header"><div><h2>Historija časova</h2><p>{{ sessions|length }} evidentiranih sesija.</p></div></div>
   {% if sessions %}
   <div class="table-wrap"><table class="responsive-table">
-    <thead><tr><th>Datum</th><th>Prisustvo</th><th>Aktivnost</th><th>Zadaća</th><th>Gradivo</th><th>Komentar</th><th></th></tr></thead>
+    <thead><tr><th>Datum</th><th>Prisustvo</th><th>Zadaća</th><th>Gradivo</th><th>Zapažanje instruktora</th><th></th></tr></thead>
     <tbody>{% for s in sessions %}
     <tr>
       <td class="cell-primary" data-label="Datum"><span class="cell-title">{{ s.session_date }}</span></td>
       <td data-label="Prisustvo">{{ attendance_labels.get(s.attendance, s.attendance) }}</td>
-      <td data-label="Aktivnost">{% if s.activity_rating %}{{ s.activity_rating }}/5{% else %}<span class="muted">—</span>{% endif %}</td>
       <td data-label="Zadaća">{{ homework_labels.get(s.homework_status, s.homework_status) }}</td>
       <td data-label="Gradivo">{{ s.area_name or "" }}{% if s.lesson_name %} · {{ s.lesson_name }}{% endif %}</td>
-      <td data-label="Komentar">{{ s.comment or "" }}</td>
+      <td data-label="Zapažanje instruktora">{{ s.comment or "" }}</td>
       <td data-label="Radnje"><form method="post" action="{{ url_for('admin_students.delete_session', student_id=student_id, session_id=s.id) }}" onsubmit="return confirm('Obrisati ovaj čas? Ova radnja se ne može poništiti.')"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="btn btn--danger">Obriši</button></form></td>
     </tr>
     {% endfor %}</tbody>

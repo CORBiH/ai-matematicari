@@ -164,7 +164,8 @@ class Page:
 
     def comment_of(self, student_id):
         found = re.search(
-            r'name="s%d_comment"[^>]*value="([^"]*)"' % student_id, self.html)
+            r'<textarea[^>]*name="s%d_comment"[^>]*>(.*?)</textarea>'
+            % student_id, self.html, re.S)
         return found.group(1) if found else None
 
 
@@ -427,11 +428,25 @@ def test_12b_a_promoted_participant_can_be_removed_explicitly(admin, db,
 # ===========================================================================
 # 13-15) STANJA UČENIKA
 # ===========================================================================
-def test_13_saved_activity_survives_a_metadata_round_trip(admin, db,
-                                                          existing, students):
+def test_13_historical_activity_is_hidden_and_survives_an_edit(admin, db,
+                                                               existing,
+                                                               students):
+    db._connection().execute(
+        "UPDATE student_sessions SET activity_rating = 4 "
+        "WHERE class_session_id = ? AND student_id = ?",
+        (existing, students[0]))
+    db._connection().commit()
     page = act(admin, open_page(admin, class_id=str(existing)),
                topic_mode=CUSTOM)
-    assert page.checked(students[0], "a") == "4"
+    assert 'name="s%d_activity"' % students[0] not in page.html
+    page = act(admin, page, lesson_name=CUSTOM_TOPIC)
+    submit(admin, page, {
+        students[0]: {"participation": "present", "activity": "1",
+                      "homework": "done", "comment": "dobar rad"},
+        students[1]: {"participation": "absent"}})
+    assert db.fetch_session(
+        db.fetch_sessions(students[0])[0]["id"], students[0])[
+            "activity_rating"] == 4
 
 
 def test_14_saved_homework_survives_a_metadata_round_trip(admin, db,
@@ -528,7 +543,7 @@ def test_18_saving_an_edit_mutates_the_same_class(admin, db, existing,
     assert len(classes_snapshot(db)) == 1, "dvojnik časa"
     rows = {r["student_id"]: r for r in db.fetch_class_students(existing)}
     assert set(rows) == set(students)
-    assert rows[students[0]]["activity_rating"] == 2
+    assert rows[students[0]]["activity_rating"] is None
     assert rows[students[0]]["comment"] == "slabije"
     assert rows[students[2]]["attendance"] == "absent"
     # Kopije u redovima učenika prate roditelja (v6 ugovor).
@@ -715,6 +730,8 @@ def test_24_an_adopted_legacy_class_edits_like_any_other(admin, db, students):
     assert class_state(db, class_id) == (DATE, "16:00", GRADE, CUSTOM, None,
                                          CUSTOM_TOPIC)
     assert len(classes_snapshot(db)) == 1
+    assert {row["activity_rating"] for row in
+            db.fetch_class_students(class_id)} == {4}
 
 
 def test_25_delete_after_an_edit_is_still_exact(admin, db, existing, students):
@@ -773,13 +790,13 @@ def test_26_draft_round_trips_change_zero_report_metrics(admin, db, existing,
         report_input.build_report_input(s, "2026-09", database=db))
         for s in students} == facts
     from matbot import report_prompt
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-3"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-4"
 
 
 def test_26b_a_metadata_only_edit_keeps_the_classroom_evidence(admin, db,
                                                                existing,
                                                                students):
-    """Promjena vremena/teme ne smije pomjeriti prisustvo, angažman ni zadaću."""
+    """Promjena vremena/teme ne smije pomjeriti prisustvo ni zadaću."""
     before = report_input.build_instruction_section(students[0], "2026-09",
                                                     database=db)
     page = act(admin, open_page(admin, class_id=str(existing)),

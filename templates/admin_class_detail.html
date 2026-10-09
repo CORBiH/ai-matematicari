@@ -28,10 +28,6 @@
     <div class="stat"><b>{{ summary.present_count }}</b><span class="muted">prisutnih</span></div>
     <div class="stat"><b>{{ summary.absent_count }}</b><span class="muted">odsutnih</span></div>
     <div class="stat">
-      <b>{% if summary.activity.average is not none %}{{ summary.activity.average }} / 5{% else %}—{% endif %}</b>
-      <span class="muted">prosječna aktivnost</span>
-    </div>
-    <div class="stat">
       <b>{{ summary.homework.done_count }}/{{ summary.homework.assigned_count }}</b>
       <span class="muted">urađena zadaća</span>
     </div>
@@ -49,16 +45,11 @@
     <div class="empty"><p>Ovaj čas nema evidentiranih učenika.</p></div>
   {% else %}
     <table class="desk">
-      <tr><th>Učenik</th><th>Prisustvo</th><th>Aktivnost</th><th>Domaća zadaća</th><th>Komentar</th></tr>
+      <tr><th>Učenik</th><th>Prisustvo</th><th>Domaća zadaća</th><th>Zapažanje instruktora</th></tr>
       {% for s in students %}
       <tr>
         <td class="who">{{ s.display_name or "Učenik #%s"|format(s.student_id) }}</td>
         <td>{{ attendance_labels.get(s.attendance, s.attendance) }}</td>
-        <td>
-          {# Aktivnost je ANGAZMAN, nikad ocjena — koriste se kanonske oznake. #}
-          {% if s.activity_rating %}{{ s.activity_rating }} — {{ activity_labels.get(s.activity_rating, '') }}
-          {% else %}—{% endif %}
-        </td>
         <td>{{ homework_labels.get(s.homework_status, s.homework_status) }}</td>
         <td class="muted">{{ s.comment or "" }}</td>
       </tr>
@@ -70,15 +61,11 @@
       <div class="stucard">
         <div class="who">{{ s.display_name or "Učenik #%s"|format(s.student_id) }}</div>
         <div class="line">{{ attendance_labels.get(s.attendance, s.attendance) }}
-          · {% if s.activity_rating %}aktivnost {{ s.activity_rating }}{% else %}bez aktivnosti{% endif %}
           · {{ homework_labels.get(s.homework_status, s.homework_status) }}</div>
         {% if s.comment %}<div class="line">{{ s.comment }}</div>{% endif %}
       </div>
       {% endfor %}
     </div>
-    <p class="muted" style="font-size:.84rem;margin-top:.8rem">
-      Aktivnost 1–5 je <b>angažman na času</b>, ne ocjena iz matematike.
-    </p>
   {% endif %}
 </section>
 

@@ -58,7 +58,8 @@ _INTERNAL_TOKENS = (
     "evidence_level", "low_evidence", "previous_available", "snapshot_missing",
     "percent_viewed", "percent_completed", "tasks_presented", "answers_total",
     "accuracy_percent", "lesson_evidence", "student_id", "course_key",
-    "metrics_json", "insufficient", "moderate evidence", "json",
+    "metrics_json", "teacher_comments", "insufficient", "moderate evidence",
+    "json",
 )
 
 # RJECNIK OCJENE. Oba korijena: imenica/glagol `ocjen-` (ocjena, ocjenu,
@@ -67,6 +68,23 @@ _INTERNAL_TOKENS = (
 # `procjena`, `samoprocjena` i `procijeniti` — u njima ispred `o` stoji slovo,
 # pa granice rijeci nema.
 _GRADE_LANGUAGE_RE = re.compile(r"\b(?:ocjen|ocijen)\w*", re.IGNORECASE)
+
+# Nova generacija nema numeričku nastavničku procjenu. Posebno odbijamo jasan
+# oblik skale uz riječi za angažman čak i kad se cifre slučajno podudaraju s
+# nekom drugom objektivnom mjerom u istom izvještaju.
+_TEACHER_RATING_RE = re.compile(
+    r"(?:\b(?:aktivnost|angazman|ucesce)\b.{0,32}\b[1-5](?:[.,]0)?\s*"
+    r"(?:/|od|do)\s*5\b|\b[1-5](?:[.,]0)?\s*(?:/|od|do)\s*5\b.{0,32}"
+    r"\b(?:aktivnost|angazman|ucesce)\b)",
+    re.IGNORECASE,
+)
+_TEACHER_RATING_BARE_RE = re.compile(
+    r"\b(?:aktivnost\s+na\s+cas(?:u|ovima)|angazman(?:\s+na\s+cas(?:u|ovima))?"
+    r"|ucesce\s+u\s+radu)\b\s*(?:je|bio(?:\s+je)?|bila(?:\s+je)?|"
+    r"bilo(?:\s+je)?|iznosi|:|-)\s*"
+    r"[1-5](?:[.,]0)?\b",
+    re.IGNORECASE,
+)
 
 _MARKUP_RE = re.compile(r"<[^>]+>|&(?:#\d+|[a-zA-Z]+);|\]\(|\*\*|```")
 _NUMBER_RE = re.compile(r"\d+(?:[.,]\d+)?")
@@ -166,6 +184,14 @@ def grade_language_violations(text):
     return sorted(set(word.lower() for word in found))
 
 
+def teacher_rating_violations(text):
+    """Jasna numerička skala aktivnosti/angažmana u novom narativu."""
+    folded = _fold(text)
+    return (["numeric_teacher_rating"]
+            if (_TEACHER_RATING_RE.search(folded)
+                or _TEACHER_RATING_BARE_RE.search(folded)) else [])
+
+
 def markup_violations(text):
     """HTML, markdown i interni nazivi polja."""
     hits = []
@@ -210,6 +236,9 @@ def validate_narrative(narrative, facts):
     if grade_words:
         problems.append("report_activity_grade_language:"
                         + ",".join(grade_words[:5]))
+
+    if teacher_rating_violations(text):
+        problems.append("report_teacher_numeric_rating")
 
     # Prazan sažetak nije izvještaj. Liste smiju biti prazne — to je namjerno
     # dopušten ishod kad dokaza nema — ali sažetak mora nešto reći.

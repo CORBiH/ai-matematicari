@@ -331,12 +331,16 @@ def test_10_area_and_lesson_are_validated_against_the_canonical_curriculum(
 # ===========================================================================
 # 11-14) STANJA UČEŠĆA
 # ===========================================================================
-def test_11_present_requires_an_activity_rating(admin, db):
+def test_11_present_requires_no_numeric_rating(admin, db):
     student_id = confirmed(db, "Sedmak", 7)
-    token = csrf_from(entry_page(admin, 7))
+    page = entry_page(admin, 7)
+    token = csrf_from(page)
+    assert b"_activity" not in page.data
+    assert "Aktivnost na času".encode() not in page.data
     admin.post("/admin/sessions/bulk",
                data=form({student_id: {"participation": "present"}}, token=token))
-    assert sessions_of(db, student_id) == []
+    stored = sessions_of(db, student_id)
+    assert len(stored) == 1 and stored[0]["activity_rating"] is None
 
 
 @pytest.mark.parametrize("homework", ["done", "not_done", "not_assigned"])
@@ -417,14 +421,15 @@ def test_16_and_17_one_invalid_row_prevents_any_partial_save(admin, db):
 
     admin.post("/admin/sessions/bulk",
                data=form({good: {"participation": "present", "activity": "4"},
-                          # prisutan BEZ angažmana → cijeli čas pada
-                          broken: {"participation": "present"}}, token=token))
+                          # Neispravna zadaća i dalje obara cijeli čas.
+                          broken: {"participation": "present",
+                                   "homework": "izmisljeno"}}, token=token))
 
     assert sessions_of(db, good) == [], "djelimično sačuvan čas"
     assert sessions_of(db, broken) == []
 
 
-def test_17b_an_out_of_range_activity_kills_the_whole_class(admin, db):
+def test_17b_forged_activity_fields_are_ignored(admin, db):
     good = confirmed(db, "Dobar Red", 7)
     broken = confirmed(db, "Neispravan Red", 7)
     token = csrf_from(entry_page(admin, 7))
@@ -432,7 +437,8 @@ def test_17b_an_out_of_range_activity_kills_the_whole_class(admin, db):
                data=form({good: {"participation": "present", "activity": "4"},
                           broken: {"participation": "present", "activity": "9"}},
                          token=token))
-    assert sessions_of(db, good) == [] and sessions_of(db, broken) == []
+    assert sessions_of(db, good)[0]["activity_rating"] is None
+    assert sessions_of(db, broken)[0]["activity_rating"] is None
 
 
 def test_18_cross_grade_student_injection_is_rejected(admin, db):
@@ -465,7 +471,7 @@ def test_19_double_submit_creates_no_duplicate_logical_session(admin, db):
 
     stored = sessions_of(db, student_id)
     assert len(stored) == 1, "dvostruko slanje je napravilo duplikat"
-    assert stored[0]["activity_rating"] == 4
+    assert stored[0]["activity_rating"] is None
 
 
 def test_19b_a_different_lesson_on_the_same_day_is_a_different_class(admin, db):
@@ -494,7 +500,7 @@ def test_20_an_existing_class_can_be_corrected_without_opening_profiles(admin, d
     klass = db.fetch_class(saved[0]["class_session_id"])
     page = admin.get("/admin/sessions/new?class_id=%d" % klass["id"])
     assert b"prva verzija" in page.data
-    assert ('id="a%d_2"' % student_id).encode() in page.data
+    assert ('name="s%d_activity"' % student_id).encode() not in page.data
 
     data = form({student_id: {"participation": "present",
                               "activity": "5", "homework": "done",
@@ -505,7 +511,7 @@ def test_20_an_existing_class_can_be_corrected_without_opening_profiles(admin, d
 
     stored = sessions_of(db, student_id)
     assert len(stored) == 1, "ispravka je napravila drugi red"
-    assert stored[0]["activity_rating"] == 5
+    assert stored[0]["activity_rating"] is None
     assert stored[0]["homework_status"] == "done"
     assert stored[0]["comment"] == "ispravljeno"
 
@@ -562,7 +568,7 @@ def test_21_to_24_bulk_metrics_equal_individual_entry_metrics(admin, db):
         record = student_sessions.validate_session(
             session_date=date, session_time=TIME,
             attendance=state,
-            activity_rating=activity if state == "present" else None,
+            activity_rating=None,
             homework_status=(homework if state == "present"
                              else class_entry.ABSENT_HOMEWORK),
             area_name=AREA, lesson_name=lesson, comment=comment, grade=7,
@@ -577,8 +583,8 @@ def test_21_to_24_bulk_metrics_equal_individual_entry_metrics(admin, db):
     assert from_bulk["sessions_total"] == 4          # 22) prisustvo
     assert from_bulk["present_count"] == 3
     assert from_bulk["absent_count"] == 1
-    assert from_bulk["activity"]["average"] == 4.0   # 24) prosjek (4+5+3)/3
-    assert from_bulk["activity"]["rated_sessions"] == 3
+    assert from_bulk["activity"]["average"] is None
+    assert from_bulk["activity"]["rated_sessions"] == 0
     # 23) imenilac: done + not_done, bez `not_assigned` i bez izostanka.
     assert from_bulk["homework"]["assigned_count"] == 2
     assert from_bulk["homework"]["done_count"] == 1
@@ -600,7 +606,7 @@ def test_23b_absent_rows_never_enter_the_homework_denominator(admin, db):
     assert summary["activity"]["average"] is None
 
 
-def test_25_comments_are_optional_and_stay_out_of_the_model_contract(admin, db):
+def test_25_comments_are_optional_and_enter_the_model_contract(admin, db):
     from matbot import report_facts
 
     student_id = confirmed(db, "Sedmak", 7)
@@ -611,17 +617,17 @@ def test_25_comments_are_optional_and_stay_out_of_the_model_contract(admin, db):
                                        "activity": "4"}}, token=token))
     assert sessions_of(db, student_id)[0]["comment"] is None
 
-    secret = "SINTETICKA BILJESKA KOJA NE SMIJE U MODEL"
+    comment = "SINTETICKA BILJESKA ZA MODEL"
     admin.post("/admin/sessions/bulk",
                data=form({student_id: {"participation": "present",
-                                       "activity": "4", "comment": secret}},
+                                       "activity": "4", "comment": comment}},
                          date="2026-09-02", token=token))
 
     payload = report_input.build_report_input(student_id, "2026-09")
     facts = report_facts.build_ai_facts(payload)
-    import json
-
-    assert secret not in json.dumps(facts, ensure_ascii=False)
+    assert facts["instruction"]["teacher_comments"] == [{
+        "date": "2026-09-02", "comment": comment}]
+    assert "activity_average" not in facts["instruction"]
 
 
 # ===========================================================================
@@ -630,7 +636,7 @@ def test_25_comments_are_optional_and_stay_out_of_the_model_contract(admin, db):
 def test_26_the_report_prompt_has_shared_account_rule():
     from matbot import report_prompt
 
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-3"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-4"
     assert "ZAJEDNICKI THINKIFIC NALOG" in report_prompt.SYSTEM_PROMPT
 
 
@@ -656,9 +662,10 @@ def test_28_the_individual_per_student_workflow_still_works(admin, db):
                      "attendance": "present",
                      "activity_rating": "5", "homework_status": "done",
                      "area_name": AREA, "lesson_name": LESSON,
-                     "comment": ""})
+                     "comment": "Autentično zapažanje."})
     stored = sessions_of(db, student_id)
-    assert len(stored) == 1 and stored[0]["activity_rating"] == 5
+    assert len(stored) == 1 and stored[0]["activity_rating"] is None
+    assert stored[0]["comment"] == "Autentično zapažanje."
 
 
 def test_29_historical_sessions_are_untouched_by_a_new_class(admin, db):

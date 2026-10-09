@@ -363,8 +363,9 @@ def build_monthly_summary(rows):
         # Ručne teme ostaju administratoru i PDF-u; u ugovor prema modelu NE
         # ulaze (vidi `report_facts._instruction_facts`).
         "custom_topics": custom_topics,
-        # Slobodan tekst instruktora. OSTAJE OVDJE I U PDF-u, a u ugovor prema
-        # modelu NE ULAZI (Dio 20) — vidi `report_facts.build_ai_facts`.
+        # Autentični slobodan tekst instruktora. Ulazi i u PDF i, kao jasno
+        # označen nepovjerljiv podatak, u ugovor prema modelu — vidi
+        # `report_facts.build_ai_facts` i `report_prompt.SYSTEM_PROMPT`.
         "parent_comments": parent_comments,
     }
     summary["signals"] = work_habit_signals(summary)

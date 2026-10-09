@@ -220,21 +220,9 @@
         </div>
       </div>
 
-      {# Polja prisutnog. Sakrivanje je pogodnost — server svejedno odbija
-         angažman kod odsutnog i traži ga kod prisutnog. #}
+      {# Polja prisutnog. Sakrivanje je samo pogodnost; server je autoritet. #}
       <div class="fields" id="f{{ s.student_id }}"
            {% if state != 'present' %}style="display:none"{% endif %}>
-        <div>
-          <div class="field-label">Aktivnost na času</div>
-          <div class="seg small">
-            {% for value, meaning in activity_labels.items() %}
-            <input type="radio" id="a{{ s.student_id }}_{{ value }}"
-                   name="s{{ s.student_id }}_activity" value="{{ value }}"
-                   {% if prior and prior.activity_rating == value %}checked{% endif %}>
-            <label for="a{{ s.student_id }}_{{ value }}" title="{{ value }} — {{ meaning }}">{{ value }}</label>
-            {% endfor %}
-          </div>
-        </div>
         <div>
           <div class="field-label">Zadaća</div>
           <div class="seg">
@@ -248,9 +236,10 @@
           </div>
         </div>
         <div style="flex:1">
-          <div class="field-label">Zapažanje <span class="muted">(neobavezno)</span></div>
-          <input type="text" class="comment" name="s{{ s.student_id }}_comment"
-                 maxlength="1000" value="{{ prior.comment if prior and prior.comment else '' }}">
+          <label class="field-label" for="c{{ s.student_id }}">Zapažanje instruktora <span class="muted">(neobavezno)</span></label>
+          <textarea id="c{{ s.student_id }}" class="comment"
+                    name="s{{ s.student_id }}_comment" rows="2"
+                    maxlength="1000">{{ prior.comment if prior and prior.comment else '' }}</textarea>
         </div>
       </div>
     </div>
@@ -264,11 +253,6 @@
     {% endif %}
   </div>
 </form>
-
-<p class="muted" style="font-size:.85rem">
-  Aktivnost 1–5 je <b>angažman na času</b>, ne ocjena iz matematike:
-  {% for value, meaning in activity_labels.items() %}{{ value }} — {{ meaning }}{% if not loop.last %} · {% endif %}{% endfor %}
-</p>
 
 <script>
   function toggleFields(id){

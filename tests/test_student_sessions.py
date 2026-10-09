@@ -584,17 +584,33 @@ def test_report_input_carries_the_instruction_section(db, student):
     assert payload["instruction"]["parent_comments"][0]["comment"] == "Bilješka."
 
 
-def test_ai_facts_never_receive_raw_class_comments(db, student):
-    """Dio 21: slobodan tekst instruktora modelu ne ide NIKAD."""
+def test_ai_facts_receive_only_the_students_dated_class_comments(db, student):
     db.insert_session(student, session(
         date="2026-08-04", comment="Tajna bilješka o porodici."))
     payload = report_input.build_report_input(student, "2026-08", database=db)
     facts = report_facts.build_ai_facts(payload)
     blob = json.dumps(facts, ensure_ascii=False)
-    assert "Tajna bilješka" not in blob
-    assert "parent_comments" not in blob
-    # A brojevi i signali JESU tu.
+    assert "Tajna bilješka o porodici." in blob
+    assert facts["instruction"]["teacher_comments"] == [{
+        "date": "2026-08-04", "comment": "Tajna bilješka o porodici."}]
+    assert "parent_comments" not in facts["instruction"]
     assert facts["instruction"]["sessions_total"] == 1
+
+
+def test_teacher_comments_are_isolated_by_canonical_student_and_month(db,
+                                                                      student):
+    other = db.create_student("Drugi Sintetički Učenik", 6)
+    db.insert_session(student, session(
+        date="2026-08-04", comment="Tačan učenik i mjesec."))
+    db.insert_session(student, session(
+        date="2026-09-04", comment="Pogrešan mjesec."))
+    db.insert_session(other, session(
+        date="2026-08-04", comment="Pogrešan učenik."))
+
+    facts = report_facts.build_ai_facts(
+        report_input.build_report_input(student, "2026-08", database=db))
+    assert facts["instruction"]["teacher_comments"] == [{
+        "date": "2026-08-04", "comment": "Tačan učenik i mjesec."}]
 
 
 def test_ai_facts_carry_no_identity(db, student):
@@ -611,12 +627,13 @@ def test_instruction_numbers_are_decided_before_the_model(db, student):
         db.insert_session(student, session(date=date, activity=4))
     payload = report_input.build_report_input(student, "2026-08", database=db)
     facts = report_facts.build_ai_facts(payload)
-    assert facts["instruction"]["activity_average"] == 4.0
+    assert "activity_average" not in facts["instruction"]
+    assert "activity_rated_sessions" not in facts["instruction"]
     assert facts["instruction"]["present_count"] == 3
     assert student_sessions.SIGNAL_CONSISTENT_ATTENDANCE in facts["instruction"]["signals"]
-    # Sve te brojke su i DOPUŠTENE modelu da ih navede.
+    # Objektivni broj časova je dopušten; istorijska procjena nije.
     allowed = report_facts.allowed_numbers(facts)
-    assert 3.0 in allowed and 4.0 in allowed
+    assert 3.0 in allowed and 4.0 not in allowed
 
 
 def test_class_curriculum_labels_are_trusted_spans(db, student):
@@ -637,10 +654,10 @@ def _facts(instruction=None, matbot=None, thinkific=None):
         "report_month": "2026-08", "grade": 6,
         "instruction": {"available": False, "sessions_total": 0,
                         "present_count": 0, "absent_count": 0,
-                        "activity_average": None, "activity_rated_sessions": 0,
                         "homework_assigned": 0, "homework_done": 0,
                         "homework_not_done": 0, "areas_worked": [],
-                        "lessons_worked": [], "signals": []},
+                        "lessons_worked": [], "teacher_comments": [],
+                        "signals": []},
         "thinkific": {"available": False, "previous_available": False,
                       "parent_sections": []},
         "matbot": {"any_activity": False, "active_days": 0,
@@ -667,11 +684,11 @@ def _text(data):
 
 
 FULL_INSTRUCTION = {"available": True, "sessions_total": 8, "present_count": 7,
-                    "absent_count": 1, "activity_average": 4.1,
-                    "activity_rated_sessions": 7, "homework_assigned": 7,
+                    "absent_count": 1, "homework_assigned": 7,
                     "homework_done": 6, "homework_not_done": 1,
                     "areas_worked": ["Razlomci", "Linearne jednačine"],
-                    "lessons_worked": [], "signals": []}
+                    "lessons_worked": [], "teacher_comments": [],
+                    "signals": []}
 
 FULL_MATBOT = {"any_activity": True, "active_days": 5,
                "practice": {"answers_total": 42, "accuracy_percent": 71.0,
@@ -696,10 +713,11 @@ def test_attendance_renders_as_a_fraction():
     assert "7 od 8" in text
 
 
-def test_activity_renders_out_of_five():
+def test_numeric_teacher_activity_does_not_render():
     _, text = _text(report_pdf.render_report_pdf(
         _facts(FULL_INSTRUCTION), _narrative(), "", "Neko"))
-    assert "4,1 / 5" in text
+    assert "Prosječna aktivnost" not in text
+    assert "/ 5" not in text
 
 
 def test_homework_renders_done_over_assigned():
@@ -886,12 +904,13 @@ def test_new_snapshot_records_the_format_version_and_comments(db, student):
     assert snapshot["report_format_version"] == parent_report.REPORT_FORMAT_VERSION
     assert snapshot["parent_comments"][0]["comment"] == "Zapažanje."
     assert snapshot["facts"]["instruction"]["sessions_total"] == 1
-    # Zapažanja stoje IZVAN činjenica.
-    assert "parent_comments" not in json.dumps(snapshot["facts"], ensure_ascii=False)
+    assert snapshot["facts"]["instruction"]["teacher_comments"][0][
+        "comment"] == "Zapažanje."
 
 
 def test_editing_a_class_record_does_not_mutate_a_saved_report(db, student):
-    db.insert_session(student, session(date="2026-08-04", activity=5))
+    db.insert_session(student, session(date="2026-08-04", activity=5,
+                                       comment="Prvobitno zapažanje."))
     payload = report_input.build_report_input(student, "2026-08", database=db)
     facts = report_facts.build_ai_facts(payload)
     snapshot = parent_report.metrics_snapshot(facts, model="m", prompt_version="p")
@@ -900,10 +919,13 @@ def test_editing_a_class_record_does_not_mutate_a_saved_report(db, student):
 
     # Instruktor kasnije mijenja čas...
     session_id = db.fetch_sessions(student)[0]["id"]
-    db.update_session(session_id, student, session(date="2026-08-04", activity=1))
+    db.update_session(session_id, student, session(
+        date="2026-08-04", activity=1, comment="Kasnije zapažanje."))
 
     saved = parent_report.load_saved(student, "2026-08", database=db)
-    assert saved["snapshot"]["facts"]["instruction"]["activity_average"] == 5.0
+    assert saved["snapshot"]["facts"]["instruction"]["teacher_comments"] == [{
+        "date": "2026-08-04", "comment": "Prvobitno zapažanje."}]
+    assert "activity_average" not in saved["snapshot"]["facts"]["instruction"]
 
 
 def test_old_snapshot_without_the_new_fields_opens_safely(db, student):
@@ -925,7 +947,7 @@ def test_old_snapshot_without_the_new_fields_opens_safely(db, student):
 # 10) PROMPT
 # ===========================================================================
 def test_prompt_version_is_3d():
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-3"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-4"
 
 
 def test_prompt_states_the_source_priority():
@@ -936,10 +958,9 @@ def test_prompt_states_the_source_priority():
 
 def test_prompt_forbids_treating_class_data_as_knowledge():
     prompt = report_prompt.SYSTEM_PROMPT
-    # 3d-2: metrika se opisuje onim STO JEST, pa se rijec „ocjena" vise
-    # ne pojavljuje ni u opisu ni u porici — samo u samoj zabrani.
-    assert "ANGAŽMAN NA ČASU" in prompt
-    assert "Zabrana važi I U PORICANJU" in prompt
+    assert "teacher_comments" in prompt
+    assert "NEPOVJERLJIV SADRŽAJ" in prompt
+    assert "numeričku procjenu nastavnika" in prompt
     assert "RADNA NAVIKA" in prompt
     assert "činjenica, nikad moralni sud" in prompt
     assert "NISKA ZAVRŠENOST KURSA SAMA PO SEBI NIJE" in prompt

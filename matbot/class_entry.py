@@ -117,8 +117,10 @@ def build_class_records(*, session_date, session_time, grade, area_name,
 
     `roster_ids` je SERVERSKI izveden skup dozvoljenih `student_id` (aktivni
     učenici s POTVRĐENIM tekućim razredom jednakim `grade`). `submissions` je
-    `{student_id: {"participation", "activity_rating", "homework_status",
-    "comment"}}` iz formulara.
+    `{student_id: {"participation", "homework_status", "comment"}}` iz
+    formulara. Interno polje `_historical_activity_rating` smije dodati samo
+    serverski kontroler pri izmjeni starog časa: ono čuva zatečeni podatak, ali
+    nastavnik više ne može unositi novu numeričku procjenu.
 
     Vraća listu `(student_id, zapis)` SAMO za prisutne i odsutne — „nije na ovom
     času" ne pravi red. Prazna lista je legitiman ishod i pozivalac je odbija
@@ -166,7 +168,7 @@ def build_class_records(*, session_date, session_time, grade, area_name,
         participation = clean_participation((fields or {}).get("participation"))
         if participation == PARTICIPATION_NOT_SCHEDULED:
             # Ne pravi red i NE provjerava se dalje: učenik kojeg nema na času
-            # ne mora imati ispravan angažman ni zadaću.
+            # ne mora imati ispravnu zadaću.
             continue
 
         # TEK OVDJE se traži pripadnost spisku. Provjera prije ovoga bi odbila
@@ -174,14 +176,15 @@ def build_class_records(*, session_date, session_time, grade, area_name,
         _require(student_id in allowed, "class_student_not_in_roster")
 
         if participation == PARTICIPATION_ABSENT:
-            # Odsutan: bez angažmana i sa SERVERSKOM zadaćom (vidi konstantu).
+            # Odsutan: sa SERVERSKOM zadaćom (vidi konstantu).
             rating = None
             homework = ABSENT_HOMEWORK
         else:
-            rating = (fields or {}).get("activity_rating")
-            # PRISUTAN MORA IMATI ANGAŽMAN. Prazno polje nije „nula" nego
-            # nedovršen unos, pa čas pada dok ga instruktor ne dopuni.
-            _require(str(rating or "").strip() != "", "class_activity_required")
+            # Numerička procjena više nije dio aktivnog toka. Pri izmjeni starog
+            # časa kontroler ovdje može vratiti ISKLJUČIVO već sačuvanu
+            # vrijednost kako uređivanje komentara ne bi brisalo istoriju.
+            # Klijentsko `activity_rating` polje se nikad ne čita.
+            rating = (fields or {}).get("_historical_activity_rating")
             homework = str((fields or {}).get("homework_status")
                            or PRESENT_HOMEWORK_DEFAULT).strip()
 

@@ -221,7 +221,7 @@ def test_6_the_same_student_may_attend_two_classes_on_one_day(admin, db):
     stored = sessions(db, student_id)
     assert len(stored) == 2, "dva stvarna časa su se sudarila"
     assert {r["session_time"] for r in stored} == {MORNING, AFTERNOON}
-    assert {r["activity_rating"] for r in stored} == {4, 5}
+    assert {r["activity_rating"] for r in stored} == {None}
     assert {r["lesson_name"] for r in stored} == {LESSON}
 
 
@@ -232,7 +232,7 @@ def test_7_repeated_save_at_the_same_time_updates_instead_of_duplicating(admin, 
         admin.post("/admin/sessions/bulk",
                    data=form({student_id: present(activity="3")}, token=token))
     stored = sessions(db, student_id)
-    assert len(stored) == 1 and stored[0]["activity_rating"] == 3
+    assert len(stored) == 1 and stored[0]["activity_rating"] is None
 
 
 def test_8_edit_loads_only_the_selected_class(admin, db):
@@ -260,17 +260,22 @@ def test_9_editing_one_group_cannot_change_the_other(admin, db):
     b = confirmed(db, "Grupa B")
     token = csrf_from(page(admin))
     admin.post("/admin/sessions/bulk",
-               data=form({a: present(activity="4")}, time=MORNING, token=token))
+               data=form({a: present(activity="4", comment="jutro")},
+                         time=MORNING, token=token))
     admin.post("/admin/sessions/bulk",
-               data=form({b: present(activity="2")}, time=AFTERNOON, token=token))
+               data=form({b: present(activity="2", comment="popodne")},
+                         time=AFTERNOON, token=token))
 
     # Popravka popodnevne grupe.
     admin.post("/admin/sessions/bulk",
-               data=form({b: present(activity="5")}, time=AFTERNOON,
+               data=form({b: present(activity="5", comment="ispravljeno")},
+                         time=AFTERNOON,
                          token=token, previous_time=AFTERNOON))
 
-    assert sessions(db, a)[0]["activity_rating"] == 4, "jutarnja grupa je izmijenjena"
-    assert sessions(db, b)[0]["activity_rating"] == 5
+    assert sessions(db, a)[0]["comment"] == "jutro", "jutarnja grupa je izmijenjena"
+    assert sessions(db, b)[0]["comment"] == "ispravljeno"
+    assert sessions(db, a)[0]["activity_rating"] is None
+    assert sessions(db, b)[0]["activity_rating"] is None
     assert len(sessions(db, b)) == 1
 
 
@@ -313,7 +318,7 @@ def test_9c_moving_onto_an_occupied_slot_fails_closed(admin, db):
 
     stored = sorted(sessions(db, student_id), key=lambda r: r["session_time"])
     assert len(stored) == 2, "časovi su spojeni"
-    assert [r["activity_rating"] for r in stored] == [4, 5], "podaci su promijenjeni"
+    assert [r["activity_rating"] for r in stored] == [None, None]
 
 
 # ===========================================================================
@@ -475,8 +480,8 @@ def test_17_to_19_custom_sessions_count_as_real_classroom_evidence(admin, db):
     assert summary["sessions_total"] == 3          # 17) prisustvo
     assert summary["present_count"] == 2
     assert summary["absent_count"] == 1
-    assert summary["activity"]["average"] == 4.5   # 18) angažman
-    assert summary["activity"]["rated_sessions"] == 2
+    assert summary["activity"]["average"] is None
+    assert summary["activity"]["rated_sessions"] == 0
     assert summary["homework"]["assigned_count"] == 2   # 19) zadaća
     assert summary["homework"]["done_count"] == 1
 
@@ -528,7 +533,7 @@ def test_20c_legacy_rows_without_topic_source_stay_curriculum(db):
 # ===========================================================================
 # 21-22) UGOVOR PREMA MODELU
 # ===========================================================================
-def test_21_raw_class_comments_stay_out_of_the_ai_facts(admin, db):
+def test_21_dated_class_comments_reach_the_ai_facts(admin, db):
     student_id = confirmed(db, "Sedmak")
     token = csrf_from(page(admin))
     admin.post("/admin/sessions/bulk",
@@ -536,9 +541,8 @@ def test_21_raw_class_comments_stay_out_of_the_ai_facts(admin, db):
                          date="2026-09-01", token=token))
     facts = report_facts.build_ai_facts(
         report_input.build_report_input(student_id, "2026-09", database=db))
-    import json
-
-    assert "TAJNO ZAPAZANJE" not in json.dumps(facts, ensure_ascii=False)
+    assert facts["instruction"]["teacher_comments"] == [{
+        "date": "2026-09-01", "comment": "TAJNO ZAPAZANJE"}]
 
 
 def test_22_the_exact_class_time_is_not_added_to_the_ai_payload(admin, db):
@@ -579,17 +583,15 @@ def test_23_and_24_two_groups_same_date_same_lesson_stay_separate(admin, db):
 
     morning = page(admin, time=MORNING).data
     afternoon = page(admin, time=AFTERNOON).data
-    for sid in group_a:
-        assert ('id="a%d_4"' % sid).encode() in morning
-    for sid in group_b:
-        assert ('id="a%d_2"' % sid).encode() in afternoon
+    assert b"_activity" not in morning
+    assert b"_activity" not in afternoon
 
     # Izmjena grupe B ne dira grupu A.
     admin.post("/admin/sessions/bulk",
                data=form({sid: present(activity="5") for sid in group_b},
                          time=AFTERNOON, token=token, previous_time=AFTERNOON))
-    assert all(sessions(db, sid)[0]["activity_rating"] == 4 for sid in group_a)
-    assert all(sessions(db, sid)[0]["activity_rating"] == 5 for sid in group_b)
+    assert all(sessions(db, sid)[0]["activity_rating"] is None
+               for sid in group_a + group_b)
 
     # Izvještaj broji svakom svoje.
     for sid in group_a + group_b:
@@ -607,7 +609,8 @@ def test_25_the_bulk_save_is_still_atomic(admin, db):
     token = csrf_from(page(admin))
     admin.post("/admin/sessions/bulk",
                data=form({good: present(),
-                          broken: {"participation": "present"}}, token=token))
+                          broken: {"participation": "present",
+                                   "homework": "izmisljeno"}}, token=token))
     assert sessions(db, good) == [] and sessions(db, broken) == []
 
 
@@ -840,7 +843,7 @@ def test_34_reporting_metrics_match_the_individual_entry_path(admin, db):
                    data=form({bulk: fields}, date=date, time=time, token=token))
         db.insert_session(single, student_sessions.validate_session(
             session_date=date, session_time=time, attendance=state,
-            activity_rating=activity if state == "present" else None,
+            activity_rating=None,
             homework_status=(homework if state == "present"
                              else class_entry.ABSENT_HOMEWORK),
             area_name=AREA, lesson_name=LESSON, comment=comment, grade=GRADE,
@@ -857,6 +860,7 @@ def test_36_the_individual_workflow_still_works_and_requires_time(admin, db):
     student_id = confirmed(db, "Sedmak")
     profile = admin.get("/admin/students/%d" % student_id)
     assert b'name="session_time"' in profile.data
+    assert b'name="activity_rating"' not in profile.data
 
     # Bez vremena se NOV zapis ne pravi.
     admin.post("/admin/students/%d/sessions" % student_id,
@@ -874,6 +878,7 @@ def test_36_the_individual_workflow_still_works_and_requires_time(admin, db):
                      "lesson_name": LESSON})
     stored = sessions(db, student_id)
     assert len(stored) == 1 and stored[0]["session_time"] == "11:30"
+    assert stored[0]["activity_rating"] is None
 
 
 def test_37_no_model_call_is_involved(admin, db, flask_app):
@@ -898,4 +903,4 @@ def test_37_no_model_call_is_involved(admin, db, flask_app):
 def test_37b_the_report_prompt_version_is_unchanged():
     from matbot import report_prompt
 
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-3"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-4"

@@ -176,7 +176,7 @@ def generate_narrative(facts, llm):
 
 # Oblik snimka. Stari nacrti Faze 3C NEMAJU ovo polje i to je jedini pouzdan
 # način da se prepoznaju — po SADRŽAJU, ne po datumu ni po zastavici.
-REPORT_FORMAT_VERSION = "3d-1"
+REPORT_FORMAT_VERSION = "3d-2"
 
 
 def metrics_snapshot(facts, *, model, prompt_version, parent_comments=None,
@@ -193,9 +193,9 @@ def metrics_snapshot(facts, *, model, prompt_version, parent_comments=None,
     ostaju ovdje jer za njih kolone nema."""
     snapshot = {
         "facts": facts,
-        # ZAPAŽANJA STOJE IZVAN `facts`, i to je granica a ne uredništvo:
-        # `facts` je tačno ono što je model vidio, pa slobodan tekst
-        # instruktora tu ne smije biti ni slučajno (Dio 21). PDF ih čita odavde.
+        # U `facts` je neizmijenjena kopija koju je model vidio. Ova zasebna
+        # kopija je dokumentni prikaz koji administrator smije urediti bez
+        # mijenjanja izvorne evidencije časa ili istorije modelskog ulaza.
         "parent_comments": list(parent_comments or []),
         "report_format_version": REPORT_FORMAT_VERSION,
         "generated_by": {"model": model, "prompt_version": prompt_version},

@@ -41,7 +41,6 @@ ERROR_UNAVAILABLE = "Izvještajna baza trenutno nije dostupna."
 ERROR_CURRICULUM = "Izaberite oblast i lekciju iz gradiva tog razreda."
 ERROR_GRADE = "Razred mora biti 6, 7, 8 ili 9."
 ERROR_DATE = "Datum časa nije ispravan."
-ERROR_ACTIVITY = "Za svakog prisutnog učenika izaberite aktivnost na času."
 ERROR_TIME = "Vrijeme časa mora biti u obliku HH:MM (na primjer 14:00)."
 ERROR_TOPIC = "Unesite temu časa."
 ERROR_TOPIC_LONG = "Tema časa je predugačka."
@@ -77,7 +76,6 @@ _MESSAGES = {
     "legacy_group_empty": ERROR_LEGACY_GONE,
     "legacy_adoption_raced": ERROR_LEGACY_RACED,
     "class_entity_unavailable": ERROR_CLASS_UNAVAILABLE,
-    "class_activity_required": ERROR_ACTIVITY,
     "class_topic_required": ERROR_TOPIC,
     "class_topic_too_long": ERROR_TOPIC_LONG,
     "class_area_too_long": ERROR_TOPIC_LONG,
@@ -289,7 +287,6 @@ def new_class():
             carried=set(),
             curriculum={}, areas=[], unconfirmed=0,
             grades=class_entry.VALID_GRADES,
-            activity_labels=student_sessions.ACTIVITY_LABELS,
             homework_labels=student_sessions.HOMEWORK_LABELS,
             homework_default=class_entry.PRESENT_HOMEWORK_DEFAULT,
             participation_labels=class_entry.PARTICIPATION_LABELS,
@@ -317,7 +314,6 @@ def new_class():
         carried=carried,
         curriculum=curriculum, areas=list(curriculum), unconfirmed=unconfirmed,
         grades=class_entry.VALID_GRADES,
-        activity_labels=student_sessions.ACTIVITY_LABELS,
         homework_labels=student_sessions.HOMEWORK_LABELS,
         homework_default=class_entry.PRESENT_HOMEWORK_DEFAULT,
         participation_labels=class_entry.PARTICIPATION_LABELS,
@@ -333,7 +329,7 @@ def new_class():
 _STUDENT_FIELD_RE = re.compile(r"\As(\d+)_participation\Z")
 
 
-def _submissions():
+def _submissions(saved=None):
     """Formular → `{student_id: polja}` za SVE poslane učenike.
 
     ČITA SE I ONO ŠTO NIJE NA SPISKU, i to je namjerno. Prva verzija je čitala
@@ -347,6 +343,7 @@ def _submissions():
     CIJELI čas umjesto da nestane. Isto pravilo hvata i bezazlen slučaj: učenik
     kojem je razred promijenjen između otvaranja stranice i čuvanja."""
     fields = {}
+    saved = saved or {}
     for key in request.form:
         match = _STUDENT_FIELD_RE.match(key)
         if not match:
@@ -355,10 +352,16 @@ def _submissions():
         prefix = "s%d_" % student_id
         fields[student_id] = {
             "participation": request.form.get(key),
-            "activity_rating": request.form.get(prefix + "activity"),
             "homework_status": request.form.get(prefix + "homework"),
             "comment": request.form.get(prefix + "comment"),
         }
+        # SAMO SERVER može prenijeti istorijsku vrijednost. Novo ili podmetnuto
+        # `s<id>_activity` polje se namjerno ignoriše. Bez ovog prijenosa bi
+        # obično uređivanje komentara na starom času obrisalo raniju procjenu.
+        prior = saved.get(student_id) or {}
+        if prior.get("attendance") == student_sessions.ATTENDANCE_PRESENT:
+            fields[student_id]["_historical_activity_rating"] = prior.get(
+                "activity_rating")
     return fields
 
 
@@ -401,8 +404,8 @@ def save_class():
         # koji više nisu u tom razredu. Da se dopušteni skup ovdje suzi na sam
         # razred, red promovisanog učenika bi pao kao „ne pripada spisku" ili bi
         # ga brisanje neposlanih tiho uklonilo.
-        roster, _, _, _ = edit_roster(_db(), chosen["grade"],
-                                      chosen["class_id"])
+        roster, _, saved, _ = edit_roster(_db(), chosen["grade"],
+                                          chosen["class_id"])
     except reporting_db.ReportingUnavailable as error:
         logger.info("admin_class_roster_failed code=%s", error.code)
         return _back(chosen, ERROR_UNAVAILABLE)
@@ -414,7 +417,7 @@ def save_class():
             topic_mode=chosen["topic_mode"],
             area_name=chosen["area_name"], lesson_name=chosen["lesson_name"],
             roster_ids=[s["student_id"] for s in roster],
-            submissions=_submissions())
+            submissions=_submissions(saved))
     except (class_entry.ClassEntryError,
             student_sessions.SessionValidationError) as error:
         # NIŠTA NIJE UPISANO: provjera je cijela obavljena prije prvog upisa.
@@ -572,7 +575,6 @@ def legacy_class():
         "admin_class_adopt.html", occurrence=occurrence, students=rows,
         summary=student_sessions.build_monthly_summary(rows),
         grades=class_entry.VALID_GRADES,
-        activity_labels=student_sessions.ACTIVITY_LABELS,
         homework_labels=student_sessions.HOMEWORK_LABELS,
         attendance_labels=student_sessions.ATTENDANCE_LABELS,
         topic_custom=student_sessions.TOPIC_CUSTOM,
@@ -644,7 +646,6 @@ def class_detail(class_id):
     return render_template(
         "admin_class_detail.html", klass=found, students=students,
         summary=summary,
-        activity_labels=student_sessions.ACTIVITY_LABELS,
         homework_labels=student_sessions.HOMEWORK_LABELS,
         attendance_labels=student_sessions.ATTENDANCE_LABELS,
         topic_labels=class_entry.TOPIC_MODE_LABELS,

@@ -10,7 +10,7 @@ import re
 
 import pytest
 
-from matbot import reporting_db, reporting_schema
+from matbot import reporting_db, reporting_schema, student_sessions
 
 from tests.test_thinkific_progress_import import build_v1, migrate
 
@@ -208,7 +208,7 @@ def _session_form(token, **over):
     # Vrijeme je od verzije 5 obavezno za SVAKI nov zapis časa.
     data = {"csrf_token": token, "session_date": "2026-08-05",
             "session_time": "10:00",
-            "attendance": "present", "activity_rating": "4",
+            "attendance": "present",
             "homework_status": "done", "area_name": "Djeljivost brojeva",
             "lesson_name": "Djeljivost zbira, razlike i proizvoda", "comment": "Dobar rad."}
     data.update(over)
@@ -221,7 +221,9 @@ def test_session_can_be_recorded(admin, db, student):
                           data=_session_form(token))
     assert response.status_code == 302
     rows = db.fetch_sessions(student)
-    assert len(rows) == 1 and rows[0]["activity_rating"] == 4
+    assert len(rows) == 1 and rows[0]["activity_rating"] is None
+    profile = admin.get("/admin/students/%d" % student)
+    assert b'name="activity_rating"' not in profile.data
 
 
 def test_recording_a_session_requires_csrf(admin, db, student):
@@ -231,11 +233,12 @@ def test_recording_a_session_requires_csrf(admin, db, student):
     assert db.fetch_sessions(student) == []
 
 
-def test_absent_with_activity_is_refused(admin, db, student):
+def test_absent_with_forged_activity_ignores_it(admin, db, student):
     token = _csrf_from(admin.get("/admin/students/%d" % student))
     admin.post("/admin/students/%d/sessions" % student,
                data=_session_form(token, attendance="absent", activity_rating="1"))
-    assert db.fetch_sessions(student) == []
+    rows = db.fetch_sessions(student)
+    assert len(rows) == 1 and rows[0]["activity_rating"] is None
 
 
 def test_absent_without_activity_is_accepted(admin, db, student):
@@ -248,11 +251,12 @@ def test_absent_without_activity_is_accepted(admin, db, student):
 
 
 @pytest.mark.parametrize("value", ["0", "6", "sedam"])
-def test_activity_outside_the_scale_is_refused(admin, db, student, value):
+def test_removed_activity_field_is_ignored(admin, db, student, value):
     token = _csrf_from(admin.get("/admin/students/%d" % student))
     admin.post("/admin/students/%d/sessions" % student,
                data=_session_form(token, activity_rating=value))
-    assert db.fetch_sessions(student) == []
+    rows = db.fetch_sessions(student)
+    assert len(rows) == 1 and rows[0]["activity_rating"] is None
 
 
 def test_invalid_date_is_refused(admin, db, student):
@@ -267,8 +271,31 @@ def test_session_can_be_edited(admin, db, student):
     admin.post("/admin/students/%d/sessions" % student, data=_session_form(token))
     session_id = db.fetch_sessions(student)[0]["id"]
     admin.post("/admin/students/%d/sessions/%d" % (student, session_id),
-               data=_session_form(token, activity_rating="2"))
-    assert db.fetch_sessions(student)[0]["activity_rating"] == 2
+               data=_session_form(token, activity_rating="2",
+                                  comment="Izmijenjeno zapažanje."))
+    saved = db.fetch_sessions(student)[0]
+    assert saved["activity_rating"] is None
+    assert saved["comment"] == "Izmijenjeno zapažanje."
+
+
+def test_editing_a_legacy_session_preserves_its_historical_rating(admin, db,
+                                                                  student):
+    record = student_sessions.validate_session(
+        session_date="2026-08-05", session_time="10:00",
+        attendance="present", activity_rating=4, homework_status="done",
+        area_name="Djeljivost brojeva",
+        lesson_name="Djeljivost zbira, razlike i proizvoda",
+        comment="Staro zapažanje.", grade=6, require_time=True)
+    session_id = db.insert_session(student, record)
+    token = _csrf_from(admin.get("/admin/students/%d" % student))
+
+    admin.post("/admin/students/%d/sessions/%d" % (student, session_id),
+               data=_session_form(token, activity_rating="1",
+                                  comment="Novo zapažanje."))
+
+    saved = db.fetch_session(session_id, student)
+    assert saved["activity_rating"] == 4
+    assert saved["comment"] == "Novo zapažanje."
 
 
 def test_session_delete_requires_csrf_and_post(admin, db, student):
@@ -301,7 +328,7 @@ def test_another_students_session_cannot_be_edited_through_the_wrong_route(
     response = admin.post("/admin/students/%d/sessions/%d" % (other, session_id),
                           data=_session_form(token, activity_rating="1"))
     assert response.status_code == 404
-    assert db.fetch_sessions(student)[0]["activity_rating"] == 4
+    assert db.fetch_sessions(student)[0]["activity_rating"] is None
 
     assert admin.post("/admin/students/%d/sessions/%d/delete" % (other, session_id),
                       data={"csrf_token": token}).status_code == 404

@@ -396,15 +396,6 @@ def _story_3c(facts, narrative, instructor_comment, label, styles, content_width
     return story
 
 
-def _fmt_activity(average):
-    """„4,1 / 5". Bez ocijenjenih časova NEMA prosjeka — nikad 0/5."""
-    if average is None:
-        return "nema dovoljno podataka"
-    number = float(average)
-    text = ("%d" % int(number)) if number == int(number) else ("%.1f" % number)
-    return "%s / 5" % text.replace(".", ",")
-
-
 def _fmt_date(value):
     """`2026-08-22` → `22.08.` — kratak oblik uz zapažanje s časa."""
     try:
@@ -421,9 +412,7 @@ def _instruction_rows(instruction):
     dok „88 %" krije da je riječ o osam časova."""
     rows = [("Evidentiranih časova", str(instruction.get("sessions_total") or 0)),
             ("Prisustvo", "%d od %d" % (instruction.get("present_count") or 0,
-                                        instruction.get("sessions_total") or 0)),
-            ("Prosječna aktivnost",
-             _fmt_activity(instruction.get("activity_average")))]
+                                        instruction.get("sessions_total") or 0))]
 
     assigned = instruction.get("homework_assigned") or 0
     if assigned:
@@ -545,8 +534,9 @@ def _story_3d(facts, narrative, instructor_comment, label, styles, content_width
             story.append(Paragraph(_escape(fallback), styles["body"]))
 
     # --- 8. Zapažanja s časova -------------------------------------------
-    # Slobodan tekst instruktora. Modelu NIJE poslan (Dio 20/21); ovdje ide
-    # doslovno, escapovan, i ograničen na tri najsvježija da ne preplavi stranu.
+    # Autentični tekst instruktora ovdje ide doslovno i escapovan. Model dobija
+    # istu datiranu činjenicu kao nepovjerljiv kontekst, ali ne smije je
+    # izvršavati kao instrukciju niti svoje prepričavanje pripisati instruktoru.
     comments = [c for c in (parent_comments or []) if (c.get("comment") or "").strip()]
     if comments:
         story.append(Paragraph("ZAPAŽANJA SA ČASOVA", styles["h2"]))
@@ -581,9 +571,9 @@ def render_report_pdf(facts, narrative, instructor_comment, label,
                       parent_comments=None):
     """Sačuvani nacrt → bajtovi PDF-a. Nikad ne zove model.
 
-    `parent_comments` se prosljeđuje ODVOJENO od `facts` namjerno: činjenice su
-    ono što je model vidio, a zapažanja s časova model ne vidi nikad. Da su u
-    istom objektu, jedan propušten filter bi ih poslao u prompt."""
+    `parent_comments` se prosljeđuje ODVOJENO od `facts` jer je to uređiva kopija
+    za dokument. `facts.instruction.teacher_comments` čuva tačan modelski ulaz;
+    stari snimci bez tog polja ostaju čitljivi."""
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
     from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate

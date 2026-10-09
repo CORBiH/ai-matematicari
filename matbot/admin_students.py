@@ -339,7 +339,6 @@ def profile(student_id):
         student_type=reporting_db.ACCOUNT_TYPE_STUDENT,
         thinkific_linked=linked, sessions=list(reversed(sessions)),
         month_summary=month_summary, month_report_saved=month_report_saved,
-        activity_labels=student_sessions.ACTIVITY_LABELS,
         homework_labels=student_sessions.HOMEWORK_LABELS,
         attendance_labels=student_sessions.ATTENDANCE_LABELS,
         csrf_token=admin_auth.csrf_token(),
@@ -512,7 +511,7 @@ def bulk_account_type():
         notice="Promijenjena vrsta naloga za %d učenika." % updated))
 
 
-def _session_from_form(grade):
+def _session_from_form(grade, *, historical_activity_rating=None):
     """Formular → provjeren zapis. Server je autoritet, ne klijent.
 
     `grade` dolazi iz BAZE (profil učenika), nikad iz formulara — inače bi
@@ -530,7 +529,13 @@ def _session_from_form(grade):
         session_date=request.form.get("session_date"),
         session_time=request.form.get("session_time"),
         attendance=request.form.get("attendance"),
-        activity_rating=request.form.get("activity_rating"),
+        # Numeričke procjene više nisu dio aktivnog nastavničkog toka. Namjerno
+        # ignoriši i ručno podmetnuto polje iz POST-a. Pri izmjeni starog
+        # prisutnog časa prenosi se samo vrijednost pročitana iz baze da obična
+        # izmjena komentara ne izbriše istorijski podatak.
+        activity_rating=(historical_activity_rating
+                         if request.form.get("attendance")
+                         == student_sessions.ATTENDANCE_PRESENT else None),
         homework_status=request.form.get("homework_status"),
         area_name=request.form.get("area_name"),
         lesson_name=request.form.get("lesson_name"),
@@ -579,6 +584,10 @@ def create_session(student_id):
         logger.info("admin_session_rejected code=%s", error.code)
         return redirect(url_for("admin_students.profile",
                                 student_id=student_id, error=ERROR_SESSION))
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_session_prepare_failed code=%s", error.code)
+        return redirect(url_for("admin_students.profile",
+                                student_id=student_id, error=ERROR_UNAVAILABLE))
     try:
         _db().insert_session(student_id, record)
     except reporting_db.ReportingUnavailable as error:
@@ -598,8 +607,13 @@ def update_session(student_id, session_id):
     tuđi zapis ne može biti izmijenjen ni s pogođenim `session_id`."""
     _require_csrf()
     try:
-        record = _session_from_form(_student_grade(
-            student_id, request.form.get("session_grade")))
+        database = _db()
+        existing = database.fetch_session(session_id, student_id)
+        if existing is None:
+            abort(404)
+        record = _session_from_form(
+            _student_grade(student_id, request.form.get("session_grade")),
+            historical_activity_rating=existing.get("activity_rating"))
     except _GradeUnknown:
         return redirect(url_for("admin_students.profile",
                                 student_id=student_id, error=ERROR_GRADE_UNKNOWN))
@@ -607,8 +621,12 @@ def update_session(student_id, session_id):
         logger.info("admin_session_rejected code=%s", error.code)
         return redirect(url_for("admin_students.profile",
                                 student_id=student_id, error=ERROR_SESSION))
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_session_update_read_failed code=%s", error.code)
+        return redirect(url_for("admin_students.profile",
+                                student_id=student_id, error=ERROR_UNAVAILABLE))
     try:
-        if not _db().update_session(session_id, student_id, record):
+        if not database.update_session(session_id, student_id, record):
             abort(404)
     except reporting_db.ReportingUnavailable as error:
         logger.info("admin_session_update_failed code=%s", error.code)
