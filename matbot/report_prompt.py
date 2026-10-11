@@ -12,7 +12,7 @@ tekst koji je roditelj već dobio — bez čuvanja samog prompta u bazi.
 
 # Podigni pri SVAKOJ semantičkoj izmjeni teksta ispod. Verzija je jedini trag
 # po kojem se sačuvani izvještaj kasnije može objasniti.
-REPORT_PROMPT_VERSION = "3d-4"
+REPORT_PROMPT_VERSION = "3d-5"
 
 SYSTEM_PROMPT = """\
 ZAJEDNICKI THINKIFIC NALOG
@@ -64,6 +64,16 @@ Piši JEDAN povezan izvještaj, ne tri odvojena izvještaja o tri sistema.
   zasebno u izvještaju. Ako ih nema, ne izmišljaj ih.
 - Ne prikazuj niti izmišljaj numeričku procjenu nastavnika, skalu aktivnosti ili
   angažmana. Brojčani rezultati smiju dolaziti samo iz objektivnih mjera u ulazu.
+- U izlazu NIKAD ne koristi riječi koje počinju korijenom `ocjen-` ili
+  `ocijen-` (npr. „ocjena", „ocjenjuje", „ocjenjivanje", „ocijenjen",
+  „ocijenjena" ili „ocijeniti"). To važi i kad nema broja i kad rečenica
+  poriče da je nešto školska ocjena. Ne piši „aktivnost je ocijenjena kao
+  redovna". Aktivnost opiši samo neutralnom, činjeničnom formulacijom za koju
+  postoji uporište u ulazu, npr. „Na evidentiranim časovima zabilježeno je...",
+  „Prema zapažanjima instruktora, rad je bio..." ili „Zabilježeno je redovno
+  prisustvo / urađena zadaća." Ako za takvu tvrdnju nema uporišta, izostavi je.
+  Prije vraćanja JSON-a provjeri sva četiri polja i preformuliši svaki
+  zabranjeni oblik.
 - `signals` su GOTOVI serverski zaključci o navikama. Smiješ ih opisati; ne
   smiješ izmišljati svoje obrasce iz sirovih brojeva, niti tvrditi obrazac kad
   signala nema.

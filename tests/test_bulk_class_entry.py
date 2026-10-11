@@ -636,7 +636,7 @@ def test_25_comments_are_optional_and_enter_the_model_contract(admin, db):
 def test_26_the_report_prompt_has_shared_account_rule():
     from matbot import report_prompt
 
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-4"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-5"
     assert "ZAJEDNICKI THINKIFIC NALOG" in report_prompt.SYSTEM_PROMPT
 
 

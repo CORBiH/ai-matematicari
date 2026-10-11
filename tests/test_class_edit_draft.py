@@ -790,7 +790,7 @@ def test_26_draft_round_trips_change_zero_report_metrics(admin, db, existing,
         report_input.build_report_input(s, "2026-09", database=db))
         for s in students} == facts
     from matbot import report_prompt
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-4"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-5"
 
 
 def test_26b_a_metadata_only_edit_keeps_the_classroom_evidence(admin, db,

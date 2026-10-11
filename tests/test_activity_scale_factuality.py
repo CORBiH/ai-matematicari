@@ -100,7 +100,7 @@ def test_prompt_marks_comments_as_untrusted_data_not_instructions():
 
 
 def test_prompt_version_records_the_new_contract():
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-4"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-5"
 
 
 def test_historical_summary_remains_readable_for_compatibility():

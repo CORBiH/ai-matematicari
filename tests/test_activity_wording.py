@@ -6,10 +6,13 @@ from tests.test_parent_report import FakeReportLLM, good_narrative, payload
 
 
 @pytest.mark.parametrize("sentence, expected", [
+    ("Angažman na časovima ocijenjen je kao redovan.", "ocijenjen"),
     ("Aktivnost na času ocijenjena je sa 4,0.", "ocijenjena"),
     ("Prosječna ocjena aktivnosti je 4,0.", "ocjena"),
     ("To nije ocjena znanja.", "ocjena"),
     ("Nastavnik ocjenjuje angažman.", "ocjenjuje"),
+    ("Ocjenjivanje aktivnosti nije dio izvještaja.", "ocjenjivanje"),
+    ("Aktivnost nije moguće ocijeniti.", "ocijeniti"),
 ])
 def test_grade_language_is_detected(sentence, expected):
     assert expected in report_validation.grade_language_violations(sentence)
@@ -48,11 +51,38 @@ def test_generation_fails_closed_on_numeric_teacher_rating():
     assert llm.calls == 1
 
 
-def test_prompt_forbids_numeric_teacher_ratings_and_direct_quote_attribution():
+def test_generation_fails_closed_on_exact_production_grade_word():
+    facts = report_facts.build_ai_facts(payload())
+    llm = FakeReportLLM(output=good_narrative(
+        summary="Angažman na časovima ocijenjen je kao redovan."))
+    with pytest.raises(parent_report.ReportGenerationError) as caught:
+        parent_report.generate_narrative(facts, llm)
+    assert caught.value.code == \
+        "report_ai_rejected:report_activity_grade_language:ocijenjen"
+    assert llm.calls == 1
+
+
+def test_generation_accepts_neutral_factual_activity_description():
+    facts = report_facts.build_ai_facts(payload())
+    summary = "Na evidentiranim časovima zabilježeno je redovno prisustvo."
+    llm = FakeReportLLM(output=good_narrative(summary=summary))
+
+    narrative = parent_report.generate_narrative(facts, llm)
+
+    assert narrative["summary"] == summary
+    assert llm.calls == 1
+
+
+def test_prompt_forbids_grade_language_and_gives_neutral_alternatives():
     prompt = " ".join(report_prompt.SYSTEM_PROMPT.split())
     assert "Ne prikazuj niti izmišljaj numeričku procjenu nastavnika" in prompt
+    assert "NIKAD ne koristi riječi koje počinju korijenom `ocjen-` ili `ocijen-`" in prompt
+    assert "aktivnost je ocijenjena kao redovna" in prompt
+    assert "Na evidentiranim časovima zabilježeno je" in prompt
+    assert "Prema zapažanjima instruktora, rad je bio" in prompt
+    assert "provjeri sva četiri polja" in prompt
     assert "ne stavljaj AI prepričavanje pod navodnike" in prompt
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-4"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-5"
 
 
 def test_internal_teacher_comment_field_cannot_leak_to_parent_text():

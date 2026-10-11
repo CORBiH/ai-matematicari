@@ -947,7 +947,7 @@ def test_old_snapshot_without_the_new_fields_opens_safely(db, student):
 # 10) PROMPT
 # ===========================================================================
 def test_prompt_version_is_3d():
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-4"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-5"
 
 
 def test_prompt_states_the_source_priority():
