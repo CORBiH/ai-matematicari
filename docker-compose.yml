@@ -50,10 +50,16 @@ services:
       # `enabled` (produkcija, upisuje deploy) = start ODBIJA pogrešnu
       # konfiguraciju. Vidi app.py i matbot/release_config.py.
       MATBOT_RELEASE_ENFORCEMENT: ${MATBOT_RELEASE_ENFORCEMENT:-}
+      # Durable reporting facts are committed here before the tutor response.
+      # This fixed path is inside the persistent ./storage bind mount below.
+      MATBOT_REPORTING_OUTBOX_PATH: /app/storage/reporting-outbox.sqlite3
+      MATBOT_REPORTING_OUTBOX_POLL_S: ${MATBOT_REPORTING_OUTBOX_POLL_S:-1.0}
+      MATBOT_REPORTING_OUTBOX_RETRY_BASE_S: ${MATBOT_REPORTING_OUTBOX_RETRY_BASE_S:-1.0}
+      MATBOT_REPORTING_OUTBOX_RETRY_MAX_S: ${MATBOT_REPORTING_OUTBOX_RETRY_MAX_S:-300.0}
     ports:
       - "127.0.0.1:8080:8080" # samo lokalno; javni saobraćaj ide kroz nginx
     volumes:
-      - ./storage:/app/storage   # SQLite activity log preživi rebuild/restart
+      - ./storage:/app/storage   # reporting outbox survives rebuild/restart
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
       interval: 30s

@@ -542,10 +542,23 @@ def reporting_db_configured():
     return bool(turso_database_url() and turso_auth_token())
 
 
-# ROK JEDNE IZVJEŠTAJNE OPERACIJE. Namjerno kratak i namjerno NEZAVISAN od
-# `AI_TUTOR_TIMEOUT`: izvještavanje je sporedno, pa ne smije dodati primjetno
-# kašnjenje tutorskom turnu. Nema retryja — jedan pokušaj, pa odustajanje.
+# Lokalna granica trajnosti i rok jednog mrežnog pokušaja. Retry radi samo
+# pozadinski outbox radnik; tutorski zahtjev nikad ne čeka Turso.
+def reporting_outbox_path():
+    """Persistent local SQLite/WAL outbox path (empty means disabled)."""
+    return (os.environ.get("MATBOT_REPORTING_OUTBOX_PATH", "") or "").strip()
+
+
+# One bounded Turso attempt. The tutor request only waits for the local SQLite
+# commit; this network timeout is consumed by the background outbox worker.
 REPORTING_DB_TIMEOUT_S = _float_env("MATBOT_REPORTING_DB_TIMEOUT_S", 2.0)
+
+# Bounded exponential retry settings for durable background delivery.
+REPORTING_OUTBOX_POLL_S = _float_env("MATBOT_REPORTING_OUTBOX_POLL_S", 1.0)
+REPORTING_OUTBOX_RETRY_BASE_S = _float_env(
+    "MATBOT_REPORTING_OUTBOX_RETRY_BASE_S", 1.0)
+REPORTING_OUTBOX_RETRY_MAX_S = _float_env(
+    "MATBOT_REPORTING_OUTBOX_RETRY_MAX_S", 300.0)
 
 # Koliko izvještajnih operacija smije biti u letu istovremeno. Iznad toga se
 # poziv ODMAH odbacuje umjesto da se stane u red — red bi pretvorio sporu bazu

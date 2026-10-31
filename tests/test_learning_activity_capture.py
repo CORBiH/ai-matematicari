@@ -54,6 +54,8 @@ CREATE TABLE learning_activity (
 @pytest.fixture
 def reporting(tmp_path, monkeypatch):
     path = str(tmp_path / "reporting.db")
+    monkeypatch.setenv(
+        "MATBOT_REPORTING_OUTBOX_PATH", str(tmp_path / "reporting-outbox.sqlite3"))
     conn = libsql.connect(path)
     for statement in IDENTITY_SCHEMA.strip().split(";"):
         # `learning_activity` iz identitetske šeme je samo placeholder — ovdje
@@ -78,7 +80,7 @@ def reporting(tmp_path, monkeypatch):
     # Odvojene niti su daemon i prezivjele bi ovaj test; drenaza
     # sprjecava da zaostao upis obori sljedeci test.
     reporting_db.wait_for_pending_writes()
-    reporting_db.set_database(None)
+    reporting_db.shutdown()
 
 
 # ---------------------------------------------------------------------------

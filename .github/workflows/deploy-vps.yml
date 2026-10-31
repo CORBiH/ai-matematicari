@@ -75,6 +75,15 @@ jobs:
             # tajne u `.env` ostaju netaknute i nikad se ne ispisuju.
             sh deploy/apply_release_env.sh .env deploy/production_release.env
 
+            # Sacuvaj TACNO image ID kontejnera koji trenutno posluzuje prije
+            # nego sto build pomjeri matbot:latest. Ovo ne mijenja zivu uslugu;
+            # samo daje brz, lokalni rollback ako novi kontejner ne moze startati.
+            RUNNING_CONTAINER=$(docker compose ps -q matbot || true)
+            if [ -n "$RUNNING_CONTAINER" ]; then
+              RUNNING_IMAGE=$(docker inspect --format '{{.Image}}' "$RUNNING_CONTAINER")
+              docker image tag "$RUNNING_IMAGE" matbot:rollback
+            fi
+
             docker compose build
 
             # KONFIGURACIJA SE PROVJERAVA PRIJE NEGO STO DIRAMO ZIVU USLUGU.
@@ -93,6 +102,13 @@ jobs:
             # učenici 30+ deployova nisu dobili nijednu novu verziju.
             docker compose run --rm --no-deps -T matbot \
               python -m matbot.release_config --require < /dev/null
+
+            # PROVJERI ISTI BIND MOUNT PRIJE ZAMJENE ZIVE USLUGE. Ovaj poziv
+            # otvara/verzionira outbox i radi rollbackovani write probe. Ako je
+            # storage read-only, zakljucan ili korumpiran, set -e prekida deploy
+            # dok prethodni kontejner i dalje posluzuje ucenike.
+            docker compose run --rm --no-deps -T matbot \
+              python -m matbot.reporting_outbox --check < /dev/null
 
             # SEMA SE MIGRIRA PRIJE ZAMJENE APLIKACIJE, NOVIM KODOM, U
             # KRATKOTRAJNOM KONTEJNERU KOJI JOS NE POSLUZUJE. Redoslijed je

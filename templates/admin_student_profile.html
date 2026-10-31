@@ -13,6 +13,7 @@
 {% block topright %}<a class="btn btn--ghost" href="{{ url_for('admin_students.index') }}">← Učenici</a>{% endblock %}
 {% block content %}
 {% if error %}<div class="banner err" role="alert">{{ error }}</div>{% endif %}
+{% if notice %}<div class="banner ok toast" role="status">{{ notice }}</div>{% endif %}
 
 {% if student.account_type == student_type and grade_status == status_unconfirmed %}
 <div class="banner warn" role="status"><strong>Trenutni razred nije potvrđen.</strong> Potvrda je potrebna za unos časa i novi izvještaj.</div>
@@ -106,6 +107,18 @@
     </form>
     {% else %}
     <p class="muted">Napredak s povezanog naloga može se uključiti u mjesečni izvještaj.</p>
+    <details class="disclosure" style="margin-top:.9rem">
+      <summary>Odobri raniju aktivnost na čekanju</summary>
+      <div class="disclosure__content">
+        <form method="post" action="{{ url_for('admin_students.approve_pending_activity', student_id=student_id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <label for="pending-thinkific-email">Ponovo unesite povezani Thinkific e-mail</label>
+          <input id="pending-thinkific-email" type="email" name="thinkific_email" maxlength="254" required autocomplete="off">
+          <label class="toggle-check" style="margin-top:.75rem"><input type="checkbox" name="confirm_pending_activity" value="1" required> <span>Razumijem da stara aktivnost potječe iz nepotpisanog URL identiteta i može biti lažno predstavljena; izričito je pripisujem ovom učeniku.</span></label>
+          <button type="submit" class="btn btn--ghost" style="margin-top:.75rem">Odobri raniju aktivnost</button>
+        </form>
+      </div>
+    </details>
     {% endif %}
   </section>
 

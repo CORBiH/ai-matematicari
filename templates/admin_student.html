@@ -13,7 +13,7 @@
 {% endif %}
 {% endblock %}
 {% block topright %}
-  {% if payload and saved %}
+  {% if payload and saved and not tracking_incomplete %}
   <a class="btn btn--ghost" target="_blank" rel="noopener" href="{{ url_for('admin_reports.report_pdf_download', student_id=payload.student_id, month=month, preview=1) }}">Pregled izvještaja</a>
   <a class="btn" href="{{ url_for('admin_reports.report_pdf_download', student_id=payload.student_id, month=month) }}">Preuzmi PDF</a>
   <a class="btn btn--ghost" href="#report-editor">Uredi</a>
@@ -31,6 +31,7 @@
 {% if payload.profile.shared_account %}
 <div class="banner warn">Aktivnost pripada zajedničkom Thinkific nalogu za oba razreda. Sistem ne može pouzdano odrediti koje je dijete napravilo pojedini događaj, pa se podaci ne dupliraju niti razdvajaju.</div>
 {% endif %}
+{% if tracking_incomplete %}<div class="banner err" role="alert">{{ tracking_incomplete_message }} Na čekanju: {{ tracking_state.pending }}, u grešci: {{ tracking_state.failed }}.</div>{% endif %}
 {% if ai_error %}<div class="banner err" role="alert">{{ ai_error }}</div>{% endif %}
 {% if notice %}<div class="banner ok toast" role="status">{{ notice }}</div>{% endif %}
 {% if not reporting_enabled %}
@@ -78,7 +79,7 @@
   <div class="empty">
     <strong>Za ovaj mjesec još nema izvještaja</strong>
     <p>Podaci su spremni za pregled. Generisanje pravi jedan AI nacrt koji poslije možete urediti.</p>
-    {% if reporting_enabled and grade_confirmed %}
+    {% if reporting_enabled and grade_confirmed and not tracking_incomplete %}
     <form method="post" action="{{ url_for('admin_reports.generate_report', student_id=payload.student_id, month=month) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <button type="submit" onclick="this.disabled=true;this.form.submit()">Generiši AI izvještaj</button>
@@ -176,7 +177,7 @@
     <p class="field-hint report-metadata-note">Ime učenika, razred i period dolaze iz registra i ovdje se ne mijenjaju. Sve tekstualne sekcije izvještaja možete urediti.</p>
     <form id="report-edit-form" method="post" action="{{ url_for('admin_reports.save_report', student_id=payload.student_id, month=month) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <fieldset {% if not reporting_enabled %}disabled{% endif %}>
+      <fieldset {% if not reporting_enabled or tracking_incomplete %}disabled{% endif %}>
         {% for field in narrative_fields %}
         <div class="report-edit-field">
           <label for="report-{{ field.name }}">{{ field.label }}</label>
@@ -201,7 +202,7 @@
     </form>
     <div class="section-header" style="margin:1rem 0 0">
       <p>Status: <span class="badge badge--neutral">{{ saved.status }}</span>{% if saved.updated_at %} · izmijenjeno {{ saved.updated_at }}{% endif %}</p>
-      {% if reporting_enabled and grade_confirmed %}
+      {% if reporting_enabled and grade_confirmed and not tracking_incomplete %}
       <details class="action-menu">
         <summary aria-label="Dodatne radnje">•••</summary>
         <div class="action-menu__panel">

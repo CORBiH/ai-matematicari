@@ -410,6 +410,13 @@ def test_the_workflow_verifies_the_configuration_and_fails_closed():
     assert "docker compose run --rm --no-deps -T matbot" in workflow
     assert "docker compose exec -T matbot" in workflow
     assert "curl -fsS --max-time 10 http://127.0.0.1:8080/healthz" in workflow
+    outbox_check = workflow.index("python -m matbot.reporting_outbox --check")
+    live_replace = workflow.index("docker compose up -d --remove-orphans")
+    assert outbox_check < live_replace, (
+        "outbox storage must be writable before the live container is replaced")
+    rollback_tag = workflow.index("docker image tag \"$RUNNING_IMAGE\" matbot:rollback")
+    image_build = workflow.index("docker compose build")
+    assert rollback_tag < image_build < live_replace
 
 
 @pytest.mark.skipif(_SH is None, reason="POSIX ljuska nije dostupna")
@@ -576,6 +583,13 @@ def test_compose_forwards_every_required_variable():
         assert name in compose, f"docker-compose.yml ne prosljeđuje {name}"
 
 
+def test_compose_mounts_the_outbox_on_persistent_storage():
+    compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    assert "MATBOT_REPORTING_OUTBOX_PATH: /app/storage/reporting-outbox.sqlite3" in compose
+    assert re.search(r"^\s+-\s+\./storage:/app/storage\s*(?:#.*)?$",
+                     compose, re.MULTILINE)
+
+
 def test_env_example_documents_every_required_variable():
     example = (ROOT / ".env.example").read_text(encoding="utf-8")
     for name in release_config.REQUIRED_RELEASE_ENV:
@@ -625,10 +639,11 @@ def test_the_flask_app_refuses_to_start_on_a_wrong_production_configuration():
     assert "MATBOT_FAST_SINGLE_CALL_SCOPE" in result.stderr
 
 
-def test_the_flask_app_accepts_one_worker_and_refuses_multiple_workers():
+def test_the_flask_app_accepts_one_worker_and_refuses_multiple_workers(tmp_path):
     production = dict(os.environ)
     production.update(release_config.REQUIRED_RELEASE_ENV)
     production["FLASK_SECRET_KEY"] = "test-only"
+    production["MATBOT_REPORTING_OUTBOX_PATH"] = str(tmp_path / "outbox.sqlite3")
 
     accepted = subprocess.run(
         [sys.executable, "-c", "import app; print('ok')"], cwd=str(ROOT),
@@ -644,3 +659,17 @@ def test_the_flask_app_accepts_one_worker_and_refuses_multiple_workers():
         env=production, timeout=180)
     assert rejected.returncode != 0
     assert "WEB_CONCURRENCY" in rejected.stderr
+
+
+def test_the_flask_app_refuses_release_without_durable_outbox():
+    production = dict(os.environ)
+    production.update(release_config.REQUIRED_RELEASE_ENV)
+    production["FLASK_SECRET_KEY"] = "test-only"
+    production.pop("MATBOT_REPORTING_OUTBOX_PATH", None)
+
+    rejected = subprocess.run(
+        [sys.executable, "-c", "import app"], cwd=str(ROOT),
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        env=production, timeout=180)
+    assert rejected.returncode != 0
+    assert "MATBOT_REPORTING_OUTBOX_PATH" in rejected.stderr

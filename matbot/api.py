@@ -99,7 +99,7 @@ def _client_ip():
 
 
 def _resolve_reporting_student(token_data, grade=None):
-    """Potpisani token -> izvještajni `students.id`.
+    """Signed token -> approved student id plus a privacy-safe subject key.
 
     JEDNA implementacija za sva ČETIRI moda. Practice, Explain i Quick dijele
     `_guarded_chat_turn`, a Kontrolni ima vlastiti guard lanac — oba zovu OVU
@@ -118,29 +118,34 @@ def _resolve_reporting_student(token_data, grade=None):
     try:
         identity = auth.reporting_identity(token_data)
         if not identity:
-            return None
+            return None, None
+        subject_key = student_identity.pending_subject_key(identity)
         # RAZRED SE NE PROSLJEDJUJE (Faza 3D): to je parametar turnusa,
         # ne tvrdnja o profilu. Vidi `student_identity.resolve_student`.
-        return student_identity.resolve_student(identity)
+        return student_identity.resolve_student(identity), subject_key
     except Exception:
         # POJAS I TREGERI. Sloj ispod je već „nikad ne baca“, ali oba pozivna
         # mjesta leže unutar `try` bloka čiji bi `except` učeniku vratio
         # SAFE_ERROR_MESSAGE, odnosno „Nismo uspjeli pripremiti test.“ Izvještajni
         # defekt tako ne može ni preko buduće greške promijeniti tutorski ishod.
         logger.info("student_resolution_failed code=unexpected")
-        return None
+        return None, None
 
 
-def _flush_reporting(student_id, events, assessment=None):
-    """Preda sve izvještajno iz ovog zahtjeva JEDNIM odvojenim poslom.
+def _flush_reporting(student_id, events, assessment=None, subject_key=None):
+    """Durably accept all reporting facts in one local SQLite transaction.
 
-    Zove se TEK kad je turn već uspio i kad je odgovor spreman, pa neuspio upis
-    ne može ni odgoditi ni promijeniti ono što učenik vidi. Bez razriješenog
-    identiteta se ne piše NIŠTA — anoniman rad ne stvara učenika (Dio 13)."""
-    if not student_id or (not events and not assessment):
+    Zove se TEK kad je turn već uspio i kad je odgovor spreman. Zahtjev čeka
+    lokalni WAL commit, ali ne čeka Turso; neuspjela prihvatna transakcija se
+    glasno bilježi i ne mijenja već pripremljen tutorski odgovor. Validan ali
+    još neodobren Thinkific identitet ide u odvojeno pending spremište; odsutan
+    ili neispravan identitet ostaje potpuno anoniman. Nijedan put ne kreira
+    učenika."""
+    if (not student_id and not subject_key) or (not events and not assessment):
         return
     try:
-        reporting_db.record_turn(student_id, events, assessment)
+        reporting_db.record_turn(student_id, events, assessment,
+                                 subject_key=subject_key)
     except Exception:                      # pragma: no cover — defanzivno
         logger.info("reporting_write_failed code=unexpected")
 
@@ -406,7 +411,8 @@ def _guarded_chat_turn():
         # ulazi ni u jedan argument tutorskog poziva — semantika turna ostaje
         # bajt za bajt ista. Bez verifikovanog e-maila je ovo `None` i nema
         # nijednog dodira s bazom.
-        student_id = _resolve_reporting_student(token_data, grade=turn.get("grade"))
+        student_id, subject_key = _resolve_reporting_student(
+            token_data, grade=turn.get("grade"))
 
         # Događaji se SAKUPLJAJU tokom turna (motor ih bilježi na mjestu gdje
         # činjenica postaje istinita), a PREDAJU tek kad je odgovor spreman.
@@ -419,7 +425,7 @@ def _guarded_chat_turn():
             else:
                 result = run_practice_turn(_get_store(), _get_llm(), turn)
             _note_simple_mode_activity(mode, result, turn)
-        _flush_reporting(student_id, events)
+        _flush_reporting(student_id, events, subject_key=subject_key)
         return 200, result
     except Exception:
         # Zadnja linija odbrane: interni exception NIKAD ne ide učeniku.
@@ -529,7 +535,7 @@ def exam_start():
     try:
         # Isti zajednički resolver kao /chat — nijedna izvještajna logika ne
         # postoji dvaput.
-        student_id = _resolve_reporting_student(token_data)
+        student_id, subject_key = _resolve_reporting_student(token_data)
 
         generated_attempt = None
         with activity.capture() as events:
@@ -556,7 +562,8 @@ def exam_start():
                     started_at=activity.event_timestamp())
         _flush_reporting(student_id, events,
                          {"kind": reporting_db.ASSESSMENT_GENERATED,
-                          "attempt": generated_attempt} if generated_attempt else None)
+                          "attempt": generated_attempt} if generated_attempt else None,
+                         subject_key=subject_key)
     except kontrolni.ExamValidationError as e:
         logger.info("validation_failed endpoint=exam_start code=%s", e.code)
         status_code, result = 400, {"error": e.code, "detail": e.detail}
@@ -594,7 +601,7 @@ def exam_submit():
         return response, 429
 
     payload = request.get_json(silent=True)
-    student_id = _resolve_reporting_student(token_data)
+    student_id, subject_key = _resolve_reporting_student(token_data)
     completed_attempt, completed_items = None, None
     try:
         with activity.capture() as events:
@@ -631,7 +638,8 @@ def exam_submit():
         _flush_reporting(student_id, events,
                          {"kind": reporting_db.ASSESSMENT_COMPLETED,
                           "attempt": completed_attempt,
-                          "items": completed_items} if completed_attempt else None)
+                          "items": completed_items} if completed_attempt else None,
+                         subject_key=subject_key)
     except kontrolni.ExamValidationError as e:
         logger.info("validation_failed endpoint=exam_submit code=%s", e.code)
         status_code, result = 400, {"error": e.code, "detail": e.detail}

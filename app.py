@@ -5,7 +5,8 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import logging
 import os
 
-from matbot import admin_auth, auth, config, release_config, student_identity
+from matbot import (admin_auth, auth, config, release_config, reporting_db,
+                    student_identity)
 from matbot.application_logging import configure_application_logging
 from matbot.admin_reports import admin_reports_bp
 from matbot.admin_sessions import admin_sessions_bp
@@ -45,11 +46,23 @@ logging.getLogger("matbot.startup").info(
 # BEZUSLOVNO, a sam prekidač je jedna od obaveznih vrijednosti.
 if release_config.release_enforcement_enabled():
     release_config.require_release_configuration()
+    if not config.reporting_outbox_path():
+        raise config.ConfigurationError(
+            "MATBOT_REPORTING_OUTBOX_PATH is required for a production release")
 else:
     for _problem in release_config.release_configuration_problems():
         logging.getLogger("matbot.startup").warning(
             "matbot_release_configuration_mismatch %s", _problem
         )
+
+# Open the local durability boundary before serving requests.  Its constructor
+# verifies the directory, WAL schema and write access; a configured but broken
+# outbox therefore fails startup instead of silently reverting to best effort.
+if config.reporting_outbox_path():
+    reporting_db.start_outbox()
+elif config.reporting_db_configured():
+    logging.getLogger("matbot.startup").error(
+        "reporting_activity_acceptance_disabled code=outbox_not_configured")
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY

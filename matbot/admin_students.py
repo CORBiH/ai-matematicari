@@ -44,6 +44,10 @@ ERROR_EMAIL = "Thinkific e-mail nije u ispravnom obliku."
 ERROR_TAKEN = "Ovaj Thinkific nalog je već povezan sa drugim učenikom."
 ERROR_SESSION = "Podaci o času nisu ispravni."
 ERROR_UNAVAILABLE = "Izvještajna baza trenutno nije dostupna."
+ERROR_PENDING_CONFIRM = (
+    "Za pripisivanje ranije aktivnosti morate izričito potvrditi upozorenje.")
+ERROR_PENDING_IDENTITY = (
+    "Uneseni Thinkific nalog nije povezan s ovim učenikom.")
 ERROR_ACCOUNT_TYPE = "Vrsta naloga nije ispravna."
 ERROR_BULK_SELECTION = "Odaberite najmanje jednog učenika."
 # Poruka iz Dijela 5: unos gradiva traži POTVRĐEN razred, ne samo neku cifru.
@@ -343,6 +347,7 @@ def profile(student_id):
         attendance_labels=student_sessions.ATTENDANCE_LABELS,
         csrf_token=admin_auth.csrf_token(),
         error=request.args.get("error", ""),
+        notice=request.args.get("notice", ""),
         month=current_month)
 
 
@@ -370,6 +375,39 @@ def link_account(student_id):
         return redirect(url_for("admin_students.profile",
                                 student_id=student_id, error=message))
     return redirect(url_for("admin_students.profile", student_id=student_id))
+
+
+@admin_students_bp.route("/<int:student_id>/approve-pending", methods=["POST"])
+@require_admin
+def approve_pending_activity(student_id):
+    """Explicitly approve unsigned historical activity for one linked account."""
+    _require_csrf()
+    if request.form.get("confirm_pending_activity") != "1":
+        return redirect(url_for("admin_students.profile", student_id=student_id,
+                                error=ERROR_PENDING_CONFIRM))
+    external = student_identity.normalize_email(
+        request.form.get("thinkific_email") or "")
+    if external is None:
+        return redirect(url_for("admin_students.profile", student_id=student_id,
+                                error=ERROR_EMAIL))
+    try:
+        owner = _db().find_student(
+            student_identity.PROVIDER_THINKIFIC_EMAIL, external)
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_pending_approval_lookup_failed code=%s", error.code)
+        return redirect(url_for("admin_students.profile", student_id=student_id,
+                                error=ERROR_UNAVAILABLE))
+    if owner is None or int(owner) != int(student_id):
+        return redirect(url_for("admin_students.profile", student_id=student_id,
+                                error=ERROR_PENDING_IDENTITY))
+    moved = reporting_db.approve_unattributed(
+        student_identity.pending_subject_key({
+            "provider": student_identity.PROVIDER_THINKIFIC_EMAIL,
+            "external_user_id": external,
+        }), student_id)
+    return redirect(url_for(
+        "admin_students.profile", student_id=student_id,
+        notice="Odobreno zapisa aktivnosti: %d." % moved))
 
 
 @admin_students_bp.route("/<int:student_id>/grade", methods=["POST"])

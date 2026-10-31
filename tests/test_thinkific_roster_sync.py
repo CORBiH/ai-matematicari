@@ -503,7 +503,8 @@ def test_new_student_is_added_by_email_without_automatic_grade(database):
     }), target)
     add = action(plan, thinkific_roster.ADD, "Nova 8")
     suggestion = action(plan, thinkific_roster.GRADE, "Nova 8")
-    assert add.default_selected is True
+    assert add.default_selected is False
+    assert add.public()["requires_explicit_confirmation"] is True
     assert suggestion.default_selected is False
 
     target.apply_roster_reconciliation([add])

@@ -10,7 +10,8 @@ import re
 
 import pytest
 
-from matbot import reporting_db, reporting_schema, student_sessions
+from matbot import (activity, reporting_db, reporting_schema, student_identity,
+                    student_sessions)
 
 from tests.test_thinkific_progress_import import build_v1, migrate
 
@@ -53,7 +54,7 @@ def db(tmp_path, monkeypatch):
     reporting_db.set_database(database)
     yield database
     reporting_db.wait_for_pending_writes()
-    reporting_db.set_database(None)
+    reporting_db.shutdown()
 
 
 def _csrf_from(response):
@@ -164,6 +165,47 @@ def test_student_without_email_gets_no_account(admin, db):
                data={"csrf_token": token, "display_name": "Bez Naloga",
                      "grade": "6"})
     assert db.list_students()[0]["thinkific_linked"] is False
+
+
+def test_unsigned_pending_history_needs_separate_explicit_approval(
+        admin, db, tmp_path, monkeypatch):
+    monkeypatch.setenv(
+        "MATBOT_REPORTING_OUTBOX_PATH", str(tmp_path / "reporting-outbox.sqlite3"))
+    email = "pending.student@example.com"
+    subject = student_identity.pending_subject_key({
+        "provider": student_identity.PROVIDER_THINKIFIC_EMAIL,
+        "external_user_id": email,
+    })
+    pending = activity.ActivityEvent(
+        activity.QUICK_COMPLETED, "quick:pending-admin:turn", mode="quick",
+        grade=6, occurred_at="2026-11-05 12:00:00")
+    assert reporting_db.record_turn(None, [pending], subject_key=subject) is True
+
+    token = _csrf_from(admin.get("/admin/students"))
+    admin.post("/admin/students/create", data={
+        "csrf_token": token, "display_name": "Pending Student", "grade": "6",
+        "thinkific_email": email,
+    })
+    student_id = db.list_students()[0]["student_id"]
+    assert reporting_db.outbox_health()["unattributed"] == 1
+
+    profile = admin.get("/admin/students/%d" % student_id)
+    assert b"confirm_pending_activity" in profile.data
+    token = _csrf_from(profile)
+    admin.post("/admin/students/%d/approve-pending" % student_id, data={
+        "csrf_token": token, "thinkific_email": email,
+    })
+    assert reporting_db.outbox_health()["unattributed"] == 1
+
+    token = _csrf_from(admin.get("/admin/students/%d" % student_id))
+    admin.post("/admin/students/%d/approve-pending" % student_id, data={
+        "csrf_token": token, "thinkific_email": email,
+        "confirm_pending_activity": "1",
+    })
+    assert reporting_db.wait_for_pending_writes(2.0) is True
+    health = reporting_db.outbox_health()
+    assert health["unattributed"] == 0
+    assert health["delivered"] == 1
 
 
 def test_duplicate_thinkific_account_fails_closed(admin, db):

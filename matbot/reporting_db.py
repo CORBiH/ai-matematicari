@@ -16,9 +16,10 @@ dobije odgovor. Zato ovaj modul ima DVA sloja:
     pozivaocu POTPUNO isto. Tutorski tokovi (Practice, Explain, Quick,
     Kontrolni) zato ne mogu pasti zbog izvještavanja.
 
-JEDAN POKUŠAJ, BEZ RETRYJA. Isti princip kao granica modelskih poziva iz
-CLAUDE.md: neuspjeh se prijavljuje, ne ponavlja. Ponavljanje bi sporu bazu
-pretvorilo u kašnjenje tutorskog turna — tačno ono što je zabranjeno.
+Mrežni pokušaj se i dalje ne ponavlja u tutorskom zahtjevu. Produkcijski put
+prvo komituje strukturirane činjenice u lokalni SQLite/WAL outbox, a odvojeni
+radnik radi ograničeni eksponencijalni retry prema Tursu. Tako mrežni kvar ne
+usporava odgovor niti pretvara prihvaćenu aktivnost u tihi gubitak.
 
 ŠTA SE NIKAD NE LOGUJE: `TURSO_AUTH_TOKEN`, URL baze, puno ime učenika, sirovi
 potpisani token. Vanjski ID se u dijagnostičkom logu pojavljuje samo kao HMAC
@@ -34,10 +35,11 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import threading
 import time
 
-from matbot import config
+from matbot import config, reporting_outbox
 
 logger = logging.getLogger("matbot.reporting_db")
 
@@ -3773,6 +3775,10 @@ _database = None
 _database_lock = threading.Lock()
 _inflight = None
 _inflight_limit = None
+_outbox = None
+_outbox_path = None
+_outbox_lock = threading.RLock()
+_outbox_accept_error = None
 
 # --- KEŠ RAZRIJEŠENOG IDENTITETA -------------------------------------------
 # IZMJERENI RAZLOG (Faza 2): `resolve_student` je SINHRON — turn ga čeka jer mu
@@ -3833,10 +3839,18 @@ def set_database(database):
 def shutdown():
     """Uredno gašenje (Dio 2). Nije obavezno — proces smije pasti i bez ovoga:
     radne niti su `daemon`, pa nijedna ne može zadržati izlaz interpretera."""
-    global _inflight, _inflight_limit
+    global _database, _inflight, _inflight_limit, _outbox, _outbox_path
+    global _outbox_accept_error
+    with _outbox_lock:
+        if _outbox is not None:
+            _outbox.close()
+        _outbox = None
+        _outbox_path = None
+        _outbox_accept_error = None
     with _database_lock:
         if _database is not None:
             _database.close()
+        _database = None
         _inflight = None
         _inflight_limit = None
         _identity_cache.clear()
@@ -4034,8 +4048,181 @@ ASSESSMENT_GENERATED = "generated"
 ASSESSMENT_COMPLETED = "completed"
 
 
-def record_turn(student_id, events=None, assessment=None, database=None):
-    """JEDAN odvojen posao po zahtjevu: događaji učenja + (opciono) procjena.
+def _outbox_delivery(payload):
+    """Validate one local envelope and make one bounded, idempotent Turso pass."""
+    from matbot import activity
+
+    if not isinstance(payload, dict) or payload.get("v") != 1:
+        return reporting_outbox.DeliveryResult(
+            False, "outbox_payload_version_invalid", False)
+    raw_events = payload.get("events")
+    if not isinstance(raw_events, list) or len(raw_events) > activity.MAX_EVENTS_PER_TURN:
+        return reporting_outbox.DeliveryResult(
+            False, "outbox_events_invalid", False)
+    events = []
+    for raw in raw_events:
+        if not isinstance(raw, dict):
+            return reporting_outbox.DeliveryResult(
+                False, "outbox_event_invalid", False)
+        event_type = raw.get("event_type")
+        event_key = raw.get("event_key")
+        if (event_type not in activity.EVENT_TYPES
+                or not isinstance(event_key, str)
+                or not event_key
+                or len(event_key) > activity.MAX_EVENT_KEY_CHARS
+                or not isinstance(raw.get("metadata", {}), dict)):
+            return reporting_outbox.DeliveryResult(
+                False, "outbox_event_invalid", False)
+        events.append(activity.ActivityEvent(
+            event_type=event_type,
+            event_key=event_key,
+            mode=raw.get("mode") or "",
+            grade=raw.get("grade"),
+            area_name=raw.get("area_name") or "",
+            lesson_id=raw.get("lesson_id") or "",
+            lesson_name=raw.get("lesson_name") or "",
+            metadata=raw.get("metadata") or {},
+            occurred_at=raw.get("occurred_at"),
+        ))
+    assessment = payload.get("assessment")
+    if assessment is not None:
+        if (not isinstance(assessment, dict)
+                or assessment.get("kind") not in (
+                    ASSESSMENT_GENERATED, ASSESSMENT_COMPLETED)
+                or not isinstance(assessment.get("attempt"), dict)):
+            return reporting_outbox.DeliveryResult(
+                False, "outbox_assessment_invalid", False)
+        attempt = assessment["attempt"]
+        if (not isinstance(attempt.get("assessment_type"), str)
+                or not attempt.get("assessment_type")
+                or not isinstance(attempt.get("external_attempt_id"), str)
+                or not attempt.get("external_attempt_id")):
+            return reporting_outbox.DeliveryResult(
+                False, "outbox_assessment_invalid", False)
+        if assessment["kind"] == ASSESSMENT_COMPLETED:
+            items = assessment.get("items")
+            if (not isinstance(items, list)
+                    or any(not isinstance(item, dict)
+                           or not isinstance(item.get("item_key"), str)
+                           or not item.get("item_key") for item in items)):
+                return reporting_outbox.DeliveryResult(
+                    False, "outbox_assessment_items_invalid", False)
+
+    def deliver():
+        target = get_database()
+        if events:
+            target.record_learning_activity(payload["student_id"], events)
+        if assessment:
+            if assessment["kind"] == ASSESSMENT_GENERATED:
+                target.record_assessment_generated(
+                    payload["student_id"], assessment["attempt"])
+            else:
+                target.record_assessment_completed(
+                    payload["student_id"], assessment["attempt"],
+                    assessment.get("items"))
+
+    # student_id is stored in a separate SQLite column and injected only after
+    # the row has been claimed; it is never accepted from serialized content.
+    if not isinstance(payload.get("student_id"), int) or payload["student_id"] <= 0:
+        return reporting_outbox.DeliveryResult(
+            False, "outbox_student_invalid", False)
+    ok, code = _call_bounded(deliver, config.REPORTING_DB_TIMEOUT_S)
+    if ok:
+        return reporting_outbox.DeliveryResult(True)
+    return reporting_outbox.DeliveryResult(False, code, True)
+
+
+def _deliver_claimed_payload(payload):
+    """Adapter used by ReportingOutbox; the row owner is attached by claim."""
+    return _outbox_delivery(payload)
+
+
+def start_outbox():
+    """Open and start the configured durable outbox, or return None."""
+    global _outbox, _outbox_path
+    path = config.reporting_outbox_path()
+    if not path:
+        return None
+    normalized = os.path.abspath(path)
+    with _outbox_lock:
+        if _outbox is not None and _outbox_path == normalized:
+            _outbox.start()
+            return _outbox
+        if _outbox is not None:
+            _outbox.close()
+        _outbox = reporting_outbox.ReportingOutbox(
+            normalized,
+            _deliver_claimed_payload,
+            poll_seconds=config.REPORTING_OUTBOX_POLL_S,
+            retry_base_seconds=config.REPORTING_OUTBOX_RETRY_BASE_S,
+            retry_max_seconds=config.REPORTING_OUTBOX_RETRY_MAX_S,
+        )
+        _outbox_path = normalized
+        _outbox.start()
+        return _outbox
+
+
+def outbox_health():
+    """Privacy-neutral operational counts; never includes payload or identity."""
+    try:
+        outbox = start_outbox()
+        report = outbox.health() if outbox else {"configured": False}
+        with _outbox_lock:
+            accept_error = _outbox_accept_error
+        if accept_error:
+            report["writable"] = False
+            report["accepting"] = False
+            report["last_accept_error"] = accept_error
+        elif outbox:
+            report["accepting"] = True
+        return report
+    except reporting_outbox.OutboxError as exc:
+        return {"configured": True, "writable": False, "error": exc.code}
+    except Exception as exc:
+        return {"configured": True, "writable": False,
+                "error": "outbox_health_unexpected:" + type(exc).__name__}
+
+
+def outbox_report_state(student_id, month_start, next_month_start):
+    try:
+        outbox = start_outbox()
+        if outbox is None:
+            return {"configured": False, "pending": 0, "failed": 0,
+                    "version": 0}
+        state = outbox.report_state(student_id, month_start, next_month_start)
+        state["configured"] = True
+        return state
+    except Exception as exc:
+        logger.error("reporting_outbox_report_state_failed code=%s",
+                     getattr(exc, "code", type(exc).__name__))
+        return {"configured": True, "pending": 0, "failed": 1,
+                "unavailable": True}
+
+
+def approve_unattributed(subject_key, student_id):
+    """Move pending facts only after an administrator has approved the link."""
+    try:
+        outbox = start_outbox()
+        if outbox is None:
+            return 0
+        total = 0
+        while True:
+            moved = outbox.claim_unattributed(subject_key, student_id)
+            total += moved
+            if moved < 250:
+                return total
+    except reporting_outbox.OutboxError as exc:
+        logger.error("unattributed_activity_approval_failed code=%s", exc.code)
+        return 0
+    except Exception as exc:
+        logger.error("unattributed_activity_approval_failed code=unexpected:%s",
+                     type(exc).__name__)
+        return 0
+
+
+def record_turn(student_id, events=None, assessment=None, database=None,
+                subject_key=None):
+    """Durably accept one turn: learning events plus optional assessment.
 
     ZAŠTO SPOJENO, A NE DVA POZIVA — IZMJERENO: dok su upis aktivnosti i upis
     procjene bili dva `_run_detached` posla, jedan zahtjev je tražio DVA slota
@@ -4045,40 +4232,44 @@ def record_turn(student_id, events=None, assessment=None, database=None):
     aktivnosti prošao. Odbacivanje pod opterećenjem je namjerno, ali mora
     pogoditi CIJELI zahtjev ili ništa, nikad polovinu koja više vrijedi.
 
-    Dva upisa unutar posla imaju ODVOJEN `try`: pad aktivnosti ne smije spriječiti
-    upis procjene, ni obrnuto. Nijedan ne baca prema pozivaocu."""
-    if not student_id or (not events and not assessment):
+    The request waits only for the local WAL commit. The worker performs bounded
+    network attempts; existing event and assessment natural keys make retries
+    idempotent. Without a configured outbox the fact is rejected loudly rather
+    than handed to the old best-effort detached thread."""
+    if (not student_id and not subject_key) or (not events and not assessment):
         return False
-    if not config.reporting_db_configured() and database is None:
+    global _outbox_accept_error
+    if not config.reporting_outbox_path():
+        with _outbox_lock:
+            _outbox_accept_error = "outbox_not_configured"
+        logger.error(
+            "reporting_persistence status=accept_failed code=outbox_not_configured")
         return False
-    target = database or get_database()
-
-    def work():
-        if events:
-            try:
-                target.record_learning_activity(student_id, events)
-            except ReportingUnavailable as exc:
-                logger.info("activity_write_failed code=%s", exc.code)
-            except Exception as exc:
-                logger.info("activity_write_failed code=unexpected:%s",
-                            type(exc).__name__)
-        if assessment:
-            kind = assessment.get("kind")
-            try:
-                if kind == ASSESSMENT_GENERATED:
-                    target.record_assessment_generated(
-                        student_id, assessment["attempt"])
-                elif kind == ASSESSMENT_COMPLETED:
-                    target.record_assessment_completed(
-                        student_id, assessment["attempt"],
-                        assessment.get("items"))
-            except ReportingUnavailable as exc:
-                logger.info("assessment_%s_failed code=%s", kind, exc.code)
-            except Exception as exc:
-                logger.info("assessment_%s_failed code=unexpected:%s",
-                            kind, type(exc).__name__)
-
-    return _run_detached(work, "reporting_write")
+    try:
+        outbox = start_outbox()
+        if student_id:
+            result = outbox.enqueue(student_id, events, assessment)
+            status = "duplicate" if result.duplicate else "accepted"
+        else:
+            result = outbox.enqueue_unattributed(
+                subject_key, events, assessment)
+            status = ("unattributed_duplicate" if result.duplicate
+                      else "unattributed")
+        logger.info("reporting_persistence status=%s", status)
+        with _outbox_lock:
+            _outbox_accept_error = None
+        return result.accepted
+    except reporting_outbox.OutboxError as exc:
+        with _outbox_lock:
+            _outbox_accept_error = exc.code
+        logger.error("reporting_persistence status=accept_failed code=%s", exc.code)
+        return False
+    except Exception as exc:  # pragma: no cover - final tutor isolation
+        with _outbox_lock:
+            _outbox_accept_error = "unexpected:" + type(exc).__name__
+        logger.error("reporting_persistence status=accept_failed code=unexpected:%s",
+                     type(exc).__name__)
+        return False
 
 
 def wait_for_pending_writes(timeout=5.0):
@@ -4095,6 +4286,12 @@ def wait_for_pending_writes(timeout=5.0):
     nijedan upis se ne gubi - samo se ceka.
 
     Za testove i uredno gasenje; zahtjevni put ovo NIKAD ne zove."""
+    if config.reporting_outbox_path():
+        try:
+            outbox = start_outbox()
+            return bool(outbox and outbox.wait_until_idle(timeout))
+        except reporting_outbox.OutboxError:
+            return False
     inflight = _get_inflight()
     limit = max(1, _inflight_limit or config.REPORTING_DB_MAX_INFLIGHT)
     acquired = 0

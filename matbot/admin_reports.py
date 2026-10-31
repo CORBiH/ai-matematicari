@@ -272,7 +272,8 @@ def _overview(month):
     komandu."""
     overview = {"classes": None, "students": None, "unconfirmed": None,
                 "report_total": None, "reports_saved": None,
-                "reports_missing": None, "available": False}
+                "reports_missing": None, "available": False,
+                "tracking": reporting_db.outbox_health()}
     try:
         database = reporting_db.get_database()
         start, end = report_input.month_bounds(month)
@@ -954,6 +955,37 @@ ERROR_GENERATION_BUSY = (
     "generisanja završe pa pokušajte ponovo.")
 
 
+ERROR_TRACKING_INCOMPLETE = (
+    "MAT-BOT aktivnost za ovaj mjesec još nije potpuno isporučena. "
+    "Izvještaj nije generisan ni sačuvan; provjerite stanje praćenja i "
+    "pokušajte ponovo kada nema redova na čekanju ili u grešci."
+)
+
+
+def _tracking_state(student_id, month):
+    start, end = report_input.month_bounds(month)
+    return reporting_db.outbox_report_state(student_id, start, end)
+
+
+def _tracking_incomplete(state):
+    return bool(state.get("unavailable") or state.get("pending")
+                or state.get("failed"))
+
+
+def _tracking_changed(before, after):
+    return int(before.get("version") or 0) != int(after.get("version") or 0)
+
+
+def _saved_tracking_stale(saved, state):
+    snapshot = (saved or {}).get("snapshot") or {}
+    return bool(
+        state.get("configured")
+        and "reporting_outbox_version" in snapshot
+        and int(snapshot.get("reporting_outbox_version") or 0)
+        != int(state.get("version") or 0)
+    )
+
+
 def _grade_confirmed(payload):
     """Je li tekući razred POTVRĐEN? Čita se iz profila, nikad iz sadržaja.
 
@@ -1002,6 +1034,8 @@ def _render_student(student_id, month, payload, *, ai_error="", notice=""):
     current_label = _student_label(payload["profile"], student_id)
     saved_label = (((saved or {}).get("snapshot") or {}).get("student")
                    or {}).get("label")
+    tracking_state = _tracking_state(student_id, month)
+    tracking_stale = _saved_tracking_stale(saved, tracking_state)
     return render_template(
         "admin_student.html", month=month, payload=payload,
         label=saved_label or current_label,
@@ -1016,6 +1050,10 @@ def _render_student(student_id, month, payload, *, ai_error="", notice=""):
         reporting_enabled=(payload.get("profile") or {}).get(
             "reporting_enabled", True),
         report_disabled_message=ERROR_REPORT_DISABLED,
+        tracking_state=tracking_state,
+        tracking_incomplete=(_tracking_incomplete(tracking_state)
+                             or tracking_stale),
+        tracking_incomplete_message=ERROR_TRACKING_INCOMPLETE,
         narrative_fields=parent_report.NARRATIVE_FIELD_SPECS,
         max_parent_comment_chars=(
             parent_report.MAX_EDITABLE_PARENT_COMMENT_CHARS),
@@ -1087,6 +1125,7 @@ def _generate_one_report_unlocked(student_id, month, *, replace):
     poziva.
     """
     started = time.perf_counter()
+    tracking_before = _tracking_state(student_id, month)
     data_started = time.perf_counter()
     payload = report_input.build_report_input(student_id, month)
     data_ms = int((time.perf_counter() - data_started) * 1000)
@@ -1094,6 +1133,13 @@ def _generate_one_report_unlocked(student_id, month, *, replace):
     if not profile.get("reporting_enabled", True):
         logger.info("admin_report_generate_blocked code=report_disabled")
         return payload, "error", ERROR_REPORT_DISABLED
+
+    tracking_state = _tracking_state(student_id, month)
+    if (_tracking_incomplete(tracking_before)
+            or _tracking_incomplete(tracking_state)
+            or _tracking_changed(tracking_before, tracking_state)):
+        logger.info("admin_report_generate_blocked code=tracking_incomplete")
+        return payload, "error", ERROR_TRACKING_INCOMPLETE
 
     try:
         saved_before = parent_report.load_saved(student_id, month)
@@ -1152,11 +1198,19 @@ def _generate_one_report_unlocked(student_id, month, *, replace):
         _REPORT_MODEL_SLOTS.release()
     ai_ms = int((time.perf_counter() - ai_started) * 1000)
 
+    tracking_final = _tracking_state(student_id, month)
+    if (_tracking_incomplete(tracking_final)
+            or _tracking_changed(tracking_state, tracking_final)):
+        logger.info("admin_report_generate_blocked code=tracking_changed")
+        return payload, "error", ERROR_TRACKING_INCOMPLETE
+
     snapshot = parent_report.metrics_snapshot(
         facts, model=config.REPORTING_MODEL,
         prompt_version=report_prompt.REPORT_PROMPT_VERSION,
         parent_comments=parent_comments,
         student_label=_student_label(payload["profile"], student_id))
+    snapshot["reporting_outbox_version"] = int(
+        tracking_final.get("version") or 0)
     if comments_were_edited:
         snapshot["parent_comments_edited"] = True
     persistence_started = time.perf_counter()
@@ -1296,9 +1350,16 @@ def bulk_generate_reports():
 
 def _saved_pdf(student_id, month):
     """Bajtovi i ime jednog već sačuvanog izvještaja, ili None."""
+    tracking_state = _tracking_state(student_id, month)
+    if _tracking_incomplete(tracking_state):
+        logger.info("admin_report_pdf_blocked code=tracking_incomplete")
+        return None
     payload = report_input.build_report_input(student_id, month)
     saved = parent_report.load_saved(student_id, month)
     if saved is None:
+        return None
+    if _saved_tracking_stale(saved, tracking_state):
+        logger.info("admin_report_pdf_blocked code=tracking_stale")
         return None
     facts = (saved.get("snapshot") or {}).get("facts")
     if not facts:
@@ -1368,6 +1429,16 @@ def save_report(student_id):
         logger.info("admin_report_save_blocked code=report_disabled")
         return _render_student(student_id, month, payload,
                                ai_error=ERROR_REPORT_DISABLED), 200
+    tracking_state = _tracking_state(student_id, month)
+    try:
+        saved_before = parent_report.load_saved(student_id, month)
+    except reporting_db.ReportingUnavailable:
+        saved_before = None
+    if (_tracking_incomplete(tracking_state)
+            or _saved_tracking_stale(saved_before, tracking_state)):
+        logger.info("admin_report_save_blocked code=tracking_incomplete")
+        return _render_student(student_id, month, payload,
+                               ai_error=ERROR_TRACKING_INCOMPLETE), 200
     try:
         parent_report.save_edits(student_id, month, _narrative_from_form(),
                                  request.form.get("instructor_comment", ""),

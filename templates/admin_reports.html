@@ -11,6 +11,18 @@
 {% endblock %}
 {% block content %}
 
+{% set tracking = overview.tracking if overview else none %}
+{% if tracking and (not tracking.configured or not tracking.writable) %}
+<div class="banner err" role="alert"><strong>Praćenje aktivnosti nije spremno.</strong> Lokalni red trajnosti nije konfigurisan ili nije dostupan; izvještaji ne smiju biti finalizovani.</div>
+{% elif tracking and tracking.failed %}
+<div class="banner err" role="alert"><strong>{{ tracking.failed }} upisa aktivnosti je u grešci.</strong> Provjerite dijagnostiku outboxa prije izrade mjesečnih izvještaja.</div>
+{% elif tracking and (tracking.pending or tracking.in_flight or tracking.retrying) %}
+<div class="banner warn" role="status"><strong>Isporuka aktivnosti je u toku.</strong> Na čekanju: {{ tracking.pending }}, u obradi: {{ tracking.in_flight }}, ponovni pokušaji: {{ tracking.retrying }}.</div>
+{% endif %}
+{% if tracking and tracking.unattributed %}
+<div class="banner warn" role="status"><strong>{{ tracking.unattributed }} zapisa čeka odobreno povezivanje identiteta.</strong> Ti zapisi nisu uključeni u službene izvještaje dok osoblje ne odobri učenika.</div>
+{% endif %}
+
 {% if overview and overview.available %}
 <section class="metrics" aria-label="Sažetak">
   <article class="metric">

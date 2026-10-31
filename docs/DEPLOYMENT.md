@@ -37,17 +37,25 @@ Docker, bound to `127.0.0.1:8080`.
    replaced in place, a missing key is appended, and nothing else in `.env` is
    touched. Secrets are neither read nor printed; only the *name* of each persisted
    key is logged.
-6. `docker compose build`.
+6. Tag the image ID of the currently serving container as `matbot:rollback`, then
+   run `docker compose build`. The tag is local to the VPS and contains no data.
 7. **Verify the configuration before the live service is replaced** —
    `docker compose run --rm --no-deps -T matbot python -m matbot.release_config --require`.
    This resolves the configuration exactly as the application does (including the
    code-owned fast-model choice) and exits non-zero on any deviation, so `set -e`
    aborts the deploy while the previously good container is still serving.
-8. `docker compose up -d --remove-orphans`, then `docker compose ps` and the last
+8. **Preflight the exact persistent bind mount before replacement** —
+   `docker compose run --rm --no-deps -T matbot python -m matbot.reporting_outbox --check`.
+   This initializes/version-checks the local schema and performs a rolled-back
+   main-database write probe. A missing writable directory is created; a
+   read-only, locked, corrupt, or incompatible database aborts while the old
+   container is still serving.
+9. Run the additive Turso migration in the temporary container.
+10. `docker compose up -d --remove-orphans`, then `docker compose ps` and the last
    80 log lines.
-9. Poll `http://127.0.0.1:8080/healthz` up to 20 times, 3 s apart. Failure after 20
+11. Poll `http://127.0.0.1:8080/healthz` up to 20 times, 3 s apart. Failure after 20
    attempts prints 150 log lines and exits non-zero.
-10. **Verify the container that actually serves students** —
+12. **Verify the container that actually serves students** —
     `docker compose exec -T matbot python -m matbot.release_config --require`,
     which also prints the effective non-secret configuration into the workflow log.
 
@@ -97,6 +105,21 @@ docker compose build
 docker compose up -d --remove-orphans
 curl -fsS http://127.0.0.1:8080/healthz
 ```
+
+**Immediate local image rollback** after a failed container replacement (the
+workflow creates `matbot:rollback` from the image that was actually serving):
+
+```bash
+# on the VPS, in VPS_APP_DIR; do not delete or replace ./storage
+docker image inspect matbot:rollback >/dev/null
+docker image tag matbot:rollback matbot:latest
+docker compose up -d --no-build --force-recreate matbot
+docker compose ps
+curl -fsS http://127.0.0.1:8080/healthz
+```
+
+This restores code quickly but uses the current `.env`; follow it with the
+preferred Git revert so code, configuration and `APP_VERSION` agree again.
 
 **Config-only rollback** (a bad model/limit setting, no code change): edit the
 variable in `.env` on the VPS and `docker compose up -d` to restart. No rebuild
@@ -154,6 +177,8 @@ tooling or documentation. Names only:
 | `MATBOT_TOKEN_TTL_SECONDS` | embed-token lifetime (7200) |
 | `MATBOT_SESSION_LIMIT_PER_MINUTE` / `_PER_HOUR` | per-session rate limit (15 / 150) |
 | `MATBOT_IP_LIMIT_PER_MINUTE` / `_PER_HOUR` | per-IP rate limit (120 / 1000) |
+| `MATBOT_REPORTING_OUTBOX_PATH` | durable SQLite/WAL reporting queue; Compose fixes it to `/app/storage/reporting-outbox.sqlite3` |
+| `MATBOT_REPORTING_OUTBOX_POLL_S`, `_RETRY_BASE_S`, `_RETRY_MAX_S` | worker polling and bounded exponential retry cadence |
 | `APP_VERSION` | written by the deploy workflow |
 | `PORT`, `THREADS`, `GUNICORN_TIMEOUT` | container/gunicorn |
 | `WEB_CONCURRENCY` | gunicorn worker count; production release contract requires exactly `1` |
@@ -169,8 +194,52 @@ in production immediately. Measure before changing `MATBOT_MAX_OUTPUT_TOKENS*`
 
 - Restarting the container clears rate-limit counters, Practice sessions and turn
   locks. Harmless, but a student mid-task loses the active question.
-- `./storage` is mounted so it survives rebuilds. Nothing in the current AI-tutor
-  path writes there — no student text, image, or conversation is persisted anywhere.
+- `./storage` is mounted so the reporting outbox survives rebuilds and restarts.
+  It stores structured activity facts and keyed pending identities only; no
+  student message, tutor answer, image, conversation, or raw e-mail is persisted.
+  The application creates and versions four local tables automatically:
+  `outbox_meta`, `reporting_outbox`, `unattributed_activity`, and
+  `approved_subjects`. This is not a Turso migration and does not alter the
+  production reporting schema.
+- Check privacy-neutral outbox state with
+  `docker compose exec -T matbot python -m matbot.reporting_outbox --check`.
+  A non-zero exit means the file is unavailable or contains permanently failed
+  rows. Pending/retrying rows block only the affected student/month report.
+- Back up `storage/reporting-outbox.sqlite3` with SQLite's online backup API (or
+  stop the container before copying the database together with its `-wal`/`-shm`
+  files). Never copy only the main file while the container runs. The Python
+  standard library is already present in the application image, so a host
+  `sqlite3` package is not required.
+- Recovery is automatic: rows left `in_flight` by a crash return to `pending`
+  at startup, and Turso writes are idempotent by their existing event/attempt
+  keys. Unattributed rows do **not** move merely because an account is created,
+  linked, roster-added, or later resolved. An administrator must open the linked
+  student profile, re-enter the address and explicitly accept the unsigned-URL
+  warning before historical rows are attributed.
+- Exactly one Gunicorn worker and one `matbot` container may use this file. The
+  release guard enforces one worker, and Compose declares one container; there is
+  no cross-process claim owner/lease. Do not scale replicas or mount this SQLite
+  file over NFS. Multi-process delivery can replay an active claim and race its
+  acknowledgement even though the downstream Turso keys are idempotent.
+- Delivered tombstones are retained to preserve local duplicate prevention;
+  unattributed, retrying and permanently failed payloads are also retained.
+  Therefore disk use is not intrinsically bounded. Monitor `file_bytes`, queue
+  counts and free space. A retention/compaction policy is required before this
+  is ever operated at materially larger volume.
+- A permanent `failed` row intentionally blocks the affected student/month.
+  There is no blind automatic retry for malformed payloads: inspect the
+  privacy-neutral error code, preserve a backup, repair the cause, and use an
+  audited one-off recovery procedure. Never delete the outbox to unblock a
+  report.
+- Pending subject keys are HMACs derived from `FLASK_SECRET_KEY`. Before rotating
+  that key, drain or explicitly reconcile all `unattributed` rows; the raw
+  e-mail is intentionally absent, so rows made with a discarded key cannot be
+  reverse-mapped later.
+- Rollback must preserve `./storage`. An older release ignores the outbox file;
+  rolling forward restores delivery. Do not delete the file to roll back code.
+  If possible, require `pending=0`, `in_flight=0`, and `failed=0` before rolling
+  back; activity created while old best-effort code is serving is outside the
+  durable guarantee and must be treated as a known reporting gap.
 - Logs never contain: the API key, the embed token, the full prompt, the full model
   output, image bytes/base64/data URLs, EXIF, or filenames. `matbot/llm.py` scrubs
   anything resembling a secret out of diagnostics before logging.

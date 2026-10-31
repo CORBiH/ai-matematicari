@@ -37,6 +37,8 @@ TEST_EMAIL = "kontrolni.ucenik@example.com"
 @pytest.fixture
 def reporting(tmp_path, monkeypatch):
     path = str(tmp_path / "reporting.db")
+    monkeypatch.setenv(
+        "MATBOT_REPORTING_OUTBOX_PATH", str(tmp_path / "reporting-outbox.sqlite3"))
     build_schema(path)
     monkeypatch.setenv("TURSO_DATABASE_URL", "libsql://test.invalid")
     monkeypatch.setenv("TURSO_AUTH_TOKEN", "test-token-not-real")
@@ -46,7 +48,7 @@ def reporting(tmp_path, monkeypatch):
     reporting_db.set_database(database)
     yield path
     reporting_db.wait_for_pending_writes()
-    reporting_db.set_database(None)
+    reporting_db.shutdown()
 
 
 def student(database):

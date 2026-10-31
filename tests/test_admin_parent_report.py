@@ -356,6 +356,42 @@ def _add_report_activity(student_id, key, month="2026-08"):
             occurred_at=month + "-10 10:00:00")])
 
 
+def test_pending_outbox_blocks_report_before_model_or_save(
+        db, student, counter, monkeypatch):
+    _add_report_activity(student, "pending-report")
+    monkeypatch.setattr(
+        admin_reports, "_tracking_state",
+        lambda _student_id, _month: {
+            "configured": True, "pending": 1, "failed": 0})
+
+    _payload, status, message = admin_reports._generate_one_report(
+        student, "2026-08", replace=True)
+
+    assert status == "error"
+    assert message == admin_reports.ERROR_TRACKING_INCOMPLETE
+    assert counter.calls == 0
+    assert rows(db, "SELECT COUNT(*) FROM monthly_reports")[0][0] == 0
+
+
+def test_activity_arriving_during_generation_prevents_stale_save(
+        db, student, counter, monkeypatch):
+    _add_report_activity(student, "generation-race")
+    versions = iter((4, 4, 5))
+    monkeypatch.setattr(
+        admin_reports, "_tracking_state",
+        lambda _student_id, _month: {
+            "configured": True, "pending": 0, "failed": 0,
+            "version": next(versions)})
+
+    _payload, status, message = admin_reports._generate_one_report(
+        student, "2026-08", replace=True)
+
+    assert status == "error"
+    assert message == admin_reports.ERROR_TRACKING_INCOMPLETE
+    assert counter.calls == 1
+    assert rows(db, "SELECT COUNT(*) FROM monthly_reports")[0][0] == 0
+
+
 def test_bulk_generation_keeps_working_when_one_student_fails(
         admin, db, student, counter):
     database = reporting_db.get_database()

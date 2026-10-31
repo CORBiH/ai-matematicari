@@ -588,7 +588,7 @@ def test_roster_preview_keeps_unrelated_same_first_name_archive_and_add(admin, d
     assert [(item["student_id"], item["label"], item["default_selected"])
             for item in archived] == [(old_id, "Daris 7", False)]
     assert [(item["student_id"], item["label"], item["default_selected"])
-            for item in added] == [(None, "Daris 8", True)]
+            for item in added] == [(None, "Daris 8", False)]
 
 
 def test_roster_preview_requires_all_four_exports(admin, db):

@@ -104,7 +104,7 @@ class RosterAction:
             "default_selected": self.default_selected,
             "selectable": self.selectable,
             "requires_explicit_confirmation": self.selectable and self.kind in (
-                ARCHIVE, REACTIVATE, GRADE),
+                ADD, ARCHIVE, REACTIVATE, GRADE),
             "unavailable_reason": self.unavailable_reason,
             "warning": self.warning,
         }
@@ -289,7 +289,7 @@ def build_plan(parsed_files, database):
             actions.append(RosterAction(
                 key=_subject_key(ADD, email), kind=ADD, student_id=None,
                 email=email, label=label, before="Nije u MAT-BOT-u",
-                after="Dodaj učenika", default_selected=True,
+                after="Dodaj učenika", default_selected=False,
                 proposed_name=proposed_name, warning=warning))
             # Novi učenik smije dobiti razred samo kao zasebnu, neoznačenu
             # potvrdu osoblja. Dodavanje samo po sebi ostavlja razred prazan.

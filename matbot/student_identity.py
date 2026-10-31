@@ -45,10 +45,12 @@ na veličinu slova, a nijedan ozbiljan provajder ne razlikuje `Student@` od
 `student@` u lokalnom dijelu. Bez toga bi isti učenik dobio novi identitet čim
 Thinkific vrati adresu s velikim početnim slovom.
 """
+import hashlib
+import hmac
 import logging
 import re
 
-from matbot import reporting_db
+from matbot import config, reporting_db
 
 logger = logging.getLogger("matbot.student_identity")
 
@@ -136,6 +138,27 @@ def fingerprint(external_user_id):
     """Nepovratan otisak za logove — sirovi e-mail nikad ne ide u log."""
     return reporting_db.fingerprint_subject(PROVIDER_THINKIFIC_EMAIL,
                                             external_user_id or "")
+
+
+def pending_subject_key(identity):
+    """Stable, privacy-safe key for approved reconciliation of pending facts.
+
+    The raw Thinkific e-mail is never written to the local outbox.  This full
+    keyed digest is deliberately separate from the short diagnostic fingerprint
+    used in logs: it is a durable equality key, not a display value.
+    """
+    if not isinstance(identity, dict):
+        return None
+    if identity.get("provider") != PROVIDER_THINKIFIC_EMAIL:
+        return None
+    external = normalize_email(identity.get("external_user_id"))
+    if external is None or not config.SECRET_KEY:
+        return None
+    material = ("matbot-unattributed-v1\x00" + PROVIDER_THINKIFIC_EMAIL
+                + "\x00" + external).encode("utf-8")
+    digest = hmac.new(config.SECRET_KEY.encode("utf-8"), material,
+                      hashlib.sha256).hexdigest()
+    return "v1:" + digest
 
 
 def resolve_student(identity):
